@@ -8,6 +8,7 @@
     "autofill": "node autofill.js",
     "scrape": "node scrape-zillow.js",
     "full": "node full-workflow.js",
+    "test": "node sce-extension/utils.test.js",
     "validate": "node tools/validate.js",
     "map-fields": "node tools/field-mapper.js",
     "cache-stats": "node autofill.js --cache-stats",
