@@ -52,18 +52,32 @@ function createProxyIndicator() {
 // Detect current page
 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   chrome.tabs.sendMessage(tabs[0].id, { action: 'detectPage' }, (response) => {
+    if (chrome.runtime.lastError) {
+      pageInfo.textContent = 'Open an SCE form page to enable auto-fill.';
+      fillBtn.disabled = true;
+      return;
+    }
+
     if (response) {
-      pageInfo.textContent = `Page: ${response.page || 'Unknown'}`;
+      const pageKey = response.page || 'Unknown';
+      const sectionTitle = response.sectionTitle || '';
+      pageInfo.textContent = sectionTitle ? `Section: ${sectionTitle}` : `Page: ${pageKey}`;
 
       // Enable button on all supported pages
       const formPages = ['customer-search', 'customer-information', 'additional-customer-info',
-                        'enrollment-information', 'project-information', 'trade-ally-information',
-                        'appointment-contact', 'assessment-questionnaire', 'measure-info', 'application-status'];
-      fillBtn.disabled = !formPages.includes(response.page);
+                        'enrollment-information', 'household-members', 'project-information',
+                        'trade-ally-information', 'appointment-contact', 'appointments',
+                        'assessment-questionnaire', 'equipment-information', 'basic-enrollment-equipment',
+                        'bonus-adjustment-measures', 'review-terms', 'file-uploads', 'review-comments',
+                        'measure-info', 'application-status'];
+      fillBtn.disabled = !formPages.includes(pageKey);
 
-      if (!formPages.includes(response.page)) {
+      if (!formPages.includes(pageKey)) {
         pageInfo.textContent += ' (Navigate to a SCE form page)';
       }
+    } else {
+      pageInfo.textContent = 'Open an SCE form page to enable auto-fill.';
+      fillBtn.disabled = true;
     }
   });
 });

@@ -354,9 +354,72 @@ async function selectDropdown(labelText, optionText) {
 }
 
 // ============================================
+// SIDEBAR SECTION HELPERS
+// ============================================
+const SECTION_TITLES_BY_KEY = {
+  'customer-information': 'Customer Information',
+  'additional-customer-info': 'Additional Customer Information',
+  'enrollment-information': 'Enrollment Information',
+  'household-members': 'Household Members',
+  'project-information': 'Project Information',
+  'trade-ally-information': 'Trade Ally Information',
+  'appointment-contact': 'Appointment Contact',
+  'appointments': 'Appointments',
+  'assessment-questionnaire': 'Assessment Questionnaire',
+  'equipment-information': 'Equipment Information',
+  'basic-enrollment-equipment': 'Basic Enrollment Equipment',
+  'bonus-adjustment-measures': 'Bonus/Adjustment Measure(s)',
+  'review-terms': 'Review Terms and Conditions',
+  'file-uploads': 'File Uploads',
+  'review-comments': 'Review Comments',
+  'application-status': 'Application Status'
+};
+
+function normalizeLabel(text) {
+  return (globalThis.SCEAutoFillUtils?.normalizeLabel || ((val) => String(val || '').trim()))(text);
+}
+
+function getSidebarSectionItems() {
+  return Array.from(document.querySelectorAll('.sections-menu-item'));
+}
+
+function getActiveSectionTitle() {
+  const active = document.querySelector('.sections-menu-item.active .sections-menu-item__title');
+  return active?.textContent?.trim() || '';
+}
+
+function goToSectionTitle(title) {
+  const targetTitle = normalizeLabel(title);
+  const items = getSidebarSectionItems();
+  const item = items.find((el) => {
+    const text = el.querySelector('.sections-menu-item__title')?.textContent || '';
+    return normalizeLabel(text) === targetTitle;
+  });
+
+  if (!item) {
+    log(`  ⚠️ Section not found in sidebar: ${title}`);
+    return false;
+  }
+
+  item.click();
+  return true;
+}
+
+function keyToSectionTitle(key) {
+  return SECTION_TITLES_BY_KEY[key] || '';
+}
+
+// ============================================
 // PAGE DETECTION (Enhanced with SCE URL routing patterns)
 // ============================================
 function detectCurrentPage() {
+  const activeTitle = getActiveSectionTitle();
+  if (activeTitle) {
+    return globalThis.SCEAutoFillUtils?.sectionTitleToKey
+      ? globalThis.SCEAutoFillUtils.sectionTitleToKey(activeTitle)
+      : 'unknown';
+  }
+
   const url = window.location.href;
 
   // Direct URL pattern matching (more reliable)
@@ -1006,7 +1069,11 @@ async function clickNext(expectedPage) {
   });
 
   if (!nextBtn) {
-    log('⚠️ Next button not found');
+    log('⚠️ Next button not found, trying sidebar navigation');
+    const sectionTitle = keyToSectionTitle(expectedPage) || expectedPage;
+    if (sectionTitle && goToSectionTitle(sectionTitle)) {
+      return waitForPage(expectedPage, 8000);
+    }
     return false;
   }
 
@@ -1201,7 +1268,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return true;
   }
   if (request.action === 'detectPage') {
-    sendResponse({ page: detectCurrentPage() });
+    sendResponse({ page: detectCurrentPage(), sectionTitle: getActiveSectionTitle() });
     return true;
   }
 });

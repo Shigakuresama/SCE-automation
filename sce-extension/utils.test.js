@@ -7,4 +7,5 @@ const utils = globalThis.SCEAutoFillUtils;
 assert.ok(utils, 'SCEAutoFillUtils should be defined');
 assert.strictEqual(utils.normalizeLabel('* Total Sq.Ft.'), 'Total Sq.Ft.');
 assert.strictEqual(utils.sectionTitleToKey('Enrollment Information'), 'enrollment-information');
+assert.strictEqual(utils.sectionTitleToKey('File Uploads'), 'file-uploads');
 assert.strictEqual(utils.addHoursToTime('2:00PM', 1), '3:00PM');
