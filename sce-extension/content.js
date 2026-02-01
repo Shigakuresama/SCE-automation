@@ -462,25 +462,6 @@ async function fillCustomFieldsForSection(sectionTitle) {
 // ============================================
 // SIDEBAR SECTION HELPERS
 // ============================================
-const SECTION_TITLES_BY_KEY = {
-  'customer-information': 'Customer Information',
-  'additional-customer-info': 'Additional Customer Information',
-  'enrollment-information': 'Enrollment Information',
-  'household-members': 'Household Members',
-  'project-information': 'Project Information',
-  'trade-ally-information': 'Trade Ally Information',
-  'appointment-contact': 'Appointment Contact',
-  'appointments': 'Appointments',
-  'assessment-questionnaire': 'Assessment Questionnaire',
-  'equipment-information': 'Equipment Information',
-  'basic-enrollment-equipment': 'Basic Enrollment Equipment',
-  'bonus-adjustment-measures': 'Bonus/Adjustment Measure(s)',
-  'review-terms': 'Review Terms and Conditions',
-  'file-uploads': 'File Uploads',
-  'review-comments': 'Review Comments',
-  'application-status': 'Application Status'
-};
-
 function normalizeLabel(text) {
   return (globalThis.SCEAutoFillUtils?.normalizeLabel || ((val) => String(val || '').trim()))(text);
 }
@@ -512,7 +493,10 @@ function goToSectionTitle(title) {
 }
 
 function keyToSectionTitle(key) {
-  return SECTION_TITLES_BY_KEY[key] || '';
+  // Use utils function if available, otherwise fallback to empty string
+  return globalThis.SCEAutoFillUtils?.keyToSectionTitle
+    ? globalThis.SCEAutoFillUtils.keyToSectionTitle(key)
+    : '';
 }
 
 // ============================================

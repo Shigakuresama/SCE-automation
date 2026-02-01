@@ -64,6 +64,22 @@ assert.strictEqual(utils.sectionTitleToKey(''), 'unknown');
 console.log('✓ sectionTitleToKey tests passed');
 
 // ============================================
+// keyToSectionTitle tests (reverse lookup)
+// ============================================
+console.log('Testing keyToSectionTitle...');
+
+// Test reverse mappings
+assert.strictEqual(utils.keyToSectionTitle('customer-information'), 'Customer Information');
+assert.strictEqual(utils.keyToSectionTitle('household-members'), 'Household Members');
+assert.strictEqual(utils.keyToSectionTitle('project-information'), 'Project Information');
+assert.strictEqual(utils.keyToSectionTitle('file-uploads'), 'File Uploads');
+
+// Unknown key returns empty string
+assert.strictEqual(utils.keyToSectionTitle('nonexistent-key'), '');
+
+console.log('✓ keyToSectionTitle tests passed');
+
+// ============================================
 // addHoursToTime tests - Valid inputs
 // ============================================
 console.log('Testing addHoursToTime (valid inputs)...');

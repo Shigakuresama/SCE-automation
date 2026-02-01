@@ -1,4 +1,29 @@
 (() => {
+  // Section mapping: title <-> key
+  const SECTION_MAP = {
+    'Customer Information': 'customer-information',
+    'Additional Customer Information': 'additional-customer-info',
+    'Enrollment Information': 'enrollment-information',
+    'Household Members': 'household-members',
+    'Project Information': 'project-information',
+    'Trade Ally Information': 'trade-ally-information',
+    'Appointment Contact': 'appointment-contact',
+    'Appointments': 'appointments',
+    'Assessment Questionnaire': 'assessment-questionnaire',
+    'Equipment Information': 'equipment-information',
+    'Basic Enrollment Equipment': 'basic-enrollment-equipment',
+    'Bonus/Adjustment Measure(s)': 'bonus-adjustment-measures',
+    'Review Terms and Conditions': 'review-terms',
+    'File Uploads': 'file-uploads',
+    'Review Comments': 'review-comments',
+    'Application Status': 'application-status'
+  };
+
+  // Create reverse lookup map (key -> title) once
+  const REVERSE_MAP = Object.fromEntries(
+    Object.entries(SECTION_MAP).map(([title, key]) => [key, title])
+  );
+
   const utils = {
     normalizeLabel(text) {
       return String(text || '')
@@ -7,25 +32,10 @@
         .trim();
     },
     sectionTitleToKey(title) {
-      const map = {
-        'Customer Information': 'customer-information',
-        'Additional Customer Information': 'additional-customer-info',
-        'Enrollment Information': 'enrollment-information',
-        'Household Members': 'household-members',
-        'Project Information': 'project-information',
-        'Trade Ally Information': 'trade-ally-information',
-        'Appointment Contact': 'appointment-contact',
-        'Appointments': 'appointments',
-        'Assessment Questionnaire': 'assessment-questionnaire',
-        'Equipment Information': 'equipment-information',
-        'Basic Enrollment Equipment': 'basic-enrollment-equipment',
-        'Bonus/Adjustment Measure(s)': 'bonus-adjustment-measures',
-        'Review Terms and Conditions': 'review-terms',
-        'File Uploads': 'file-uploads',
-        'Review Comments': 'review-comments',
-        'Application Status': 'application-status'
-      };
-      return map[title] || 'unknown';
+      return SECTION_MAP[title] || 'unknown';
+    },
+    keyToSectionTitle(key) {
+      return REVERSE_MAP[key] || '';
     },
     addHoursToTime(time, hours) {
       const match = String(time || '').match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
