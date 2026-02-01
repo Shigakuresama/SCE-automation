@@ -44,5 +44,11 @@
     }
   };
 
-  globalThis.SCEAutoFillUtils = utils;
+  // Use non-enumerable, non-writable property to prevent page code from modifying
+  Object.defineProperty(globalThis, 'SCEAutoFillUtils', {
+    value: utils,
+    writable: false,
+    configurable: false,
+    enumerable: false
+  });
 })();

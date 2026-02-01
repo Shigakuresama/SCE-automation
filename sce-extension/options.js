@@ -3,36 +3,36 @@
  */
 
 const defaultConfig = {
-  address: '22216 Seine',
-  zipCode: '90716',
-  firstName: 'Sergio',
+  address: '123 Main St', // Placeholder - update with your address
+  zipCode: '90210', // Placeholder - update with your ZIP
+  firstName: 'John', // Placeholder - update with your name
   title: 'Outreach',
-  phone: '7143912727',
+  phone: '5551234567', // Placeholder - update with your phone
   preferredContactTime: '1:00PM - 3:30PM',
-  language: 'Spanish',
-  ethnicity: 'Hispanic/Latino',
+  language: 'English',
+  ethnicity: 'Decline to state',
   householdUnits: '1',
   spaceOrUnit: '1',
   howDidYouHear: 'Contractor Outreach',
   masterMetered: 'Yes',
   buildingType: 'Residential',
   homeownerOrRenter: 'Renter/Tenant',
-  contractorName: 'Sergio Corp',
-  attempt1Date: '01/30/2026',
+  contractorName: 'Your Company', // Placeholder - update with your company
+  attempt1Date: '',
   attempt1Time: '2:00PM',
-  attempt2Date: '01/31/2026',
+  attempt2Date: '',
   attempt2Time: '3:00PM',
   appointmentEndTime: '',
   appointmentType: 'On-Site Appointment',
   appointmentStatus: 'Scheduled',
   gasProvider: 'SoCalGas',
-  gasAccountNumber: '1',
+  gasAccountNumber: '', // Placeholder - update with your account
   waterUtility: 'N/A',
   primaryApplicantAge: '44',
   permanentlyDisabled: 'No',
   veteran: 'No',
   nativeAmerican: 'No',
-  incomeVerifiedDate: '01/31/2026',
+  incomeVerifiedDate: '',
   zillowSqFt: '',
   zillowYearBuilt: '',
   householdMembers: [
@@ -89,6 +89,22 @@ function loadConfig() {
 
 // Save config
 function saveConfig() {
+  // Validate customFieldMap JSON before saving
+  const customFieldMapInput = document.getElementById('customFieldMap').value;
+  if (customFieldMapInput.trim()) {
+    try {
+      const parsed = JSON.parse(customFieldMapInput);
+      // Ensure it's an object, not an array
+      if (Array.isArray(parsed)) {
+        showStatus('❌ Custom Field Map must be a JSON object, not an array. Example: {"Project Information": {"Total Sq.Ft.": "1200"}}', 'error');
+        return;
+      }
+    } catch (e) {
+      showStatus(`❌ Invalid JSON in Custom Field Map: ${e.message}`, 'error');
+      return;
+    }
+  }
+
   const config = {
     address: document.getElementById('address').value,
     zipCode: document.getElementById('zipCode').value,
@@ -128,18 +144,23 @@ function saveConfig() {
         age: document.getElementById('householdMemberAge1').value
       }
     ],
-    customFieldMap: document.getElementById('customFieldMap').value,
+    customFieldMap: customFieldMapInput,
     autoFillPrompt: document.getElementById('autoFillPrompt').checked
   };
 
   chrome.storage.sync.set({ sceConfig: config }, () => {
-    const status = document.getElementById('status');
-    status.textContent = '✅ Settings saved!';
-    status.className = 'success';
-    setTimeout(() => {
-      status.className = '';
-    }, 2000);
+    showStatus('✅ Settings saved!', 'success');
   });
+}
+
+// Helper to show status messages
+function showStatus(message, className) {
+  const status = document.getElementById('status');
+  status.textContent = message;
+  status.className = className;
+  setTimeout(() => {
+    status.className = '';
+  }, 3000);
 }
 
 // Reset to defaults

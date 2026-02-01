@@ -51,9 +51,23 @@ function createProxyIndicator() {
 
 // Detect current page
 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  if (!tabs || !tabs[0]) {
+    pageInfo.textContent = 'No active tab found.';
+    fillBtn.disabled = true;
+    return;
+  }
+
   chrome.tabs.sendMessage(tabs[0].id, { action: 'detectPage' }, (response) => {
     if (chrome.runtime.lastError) {
-      pageInfo.textContent = 'Open an SCE form page to enable auto-fill.';
+      const errorMsg = chrome.runtime.lastError.message;
+      // Distinguish different error types
+      if (errorMsg.includes('Receiving end does not exist')) {
+        pageInfo.textContent = 'Open an SCE form page to enable auto-fill.';
+      } else if (errorMsg.includes('message port closed')) {
+        pageInfo.textContent = 'Page is loading. Try refreshing.';
+      } else {
+        pageInfo.textContent = 'Could not communicate with page. Try refreshing.';
+      }
       fillBtn.disabled = true;
       return;
     }

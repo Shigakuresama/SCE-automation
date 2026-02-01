@@ -9,6 +9,10 @@ auth/
 !package.json
 !sce-extension/manifest.json
 
+# Extension PII config (DO NOT COMMIT actual data)
+sce-extension/config.json
+!sce-extension/config.example.json
+
 # Output files
 output/
 screenshots/

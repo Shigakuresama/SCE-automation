@@ -9,35 +9,35 @@ console.log('[SCE Auto-Fill] Content script loaded');
 // CONFIG (loaded from storage)
 // ============================================
 let config = {
-  address: '22216 Seine',
-  zipCode: '90716',
-  firstName: 'Sergio',
+  address: '123 Main St', // Placeholder - configure in options
+  zipCode: '90210', // Placeholder - configure in options
+  firstName: 'John', // Placeholder - configure in options
   title: 'Outreach',
-  phone: '7143912727',
+  phone: '5551234567', // Placeholder - configure in options
   preferredContactTime: '1:00PM - 3:30PM',
-  language: 'Spanish',
-  ethnicity: 'Hispanic/Latino',
+  language: 'English',
+  ethnicity: 'Decline to state',
   householdUnits: '1',
   spaceOrUnit: '1',
   howDidYouHear: 'Contractor Outreach',
   masterMetered: 'Yes',
   buildingType: 'Residential',
-  contractorName: 'Sergio Corp',
-  attempt1Date: '01/30/2026',
+  contractorName: 'Your Company', // Placeholder - configure in options
+  attempt1Date: '', // Will be set dynamically
   attempt1Time: '2:00PM',
-  attempt2Date: '01/31/2026',
+  attempt2Date: '', // Will be set dynamically
   attempt2Time: '3:00PM',
   appointmentEndTime: '',
   appointmentType: 'On-Site Appointment',
   appointmentStatus: 'Scheduled',
   gasProvider: 'SoCalGas',
-  gasAccountNumber: '1',
+  gasAccountNumber: '', // Placeholder - configure in options
   waterUtility: 'N/A',
   primaryApplicantAge: '44',
   permanentlyDisabled: 'No',
   veteran: 'No',
   nativeAmerican: 'No',
-  incomeVerifiedDate: '01/31/2026',
+  incomeVerifiedDate: '', // Will be set dynamically
   autoFillPrompt: true,
   householdMembers: [
     { name: '', age: '' }
@@ -48,13 +48,25 @@ let config = {
   zillowYearBuilt: ''
 };
 
-// Load config from storage
-chrome.storage.sync.get('sceConfig', (result) => {
-  if (result.sceConfig) {
-    config = { ...config, ...result.sceConfig };
-    console.log('[SCE Auto-Fill] Config loaded:', config);
+// ============================================
+// CONFIG LOADING (async with Promise to prevent race conditions)
+// ============================================
+let configLoadPromise = null;
+
+function loadConfig() {
+  if (!configLoadPromise) {
+    configLoadPromise = new Promise((resolve) => {
+      chrome.storage.sync.get('sceConfig', (result) => {
+        if (result.sceConfig) {
+          config = { ...config, ...result.sceConfig };
+          console.log('[SCE Auto-Fill] Config loaded:', config);
+        }
+        resolve(config);
+      });
+    });
   }
-});
+  return configLoadPromise;
+}
 
 // Listen for config updates
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -88,11 +100,14 @@ let zillowData = {
 const PROXY_URL = 'http://localhost:3000';
 let proxyAvailable = null; // null = unknown, true = available, false = unavailable
 let proxyLastCheckedAt = 0;
-const PROXY_STATUS_TTL_MS = 30000;
+const PROXY_STATUS_TTL_MS = 30000; // 30s for successful checks
+const PROXY_FAILURE_RETRY_MS = 5000; // 5s for failed checks (retry faster)
 
 async function checkProxyStatus(force = false) {
   const now = Date.now();
-  if (!force && proxyAvailable !== null && (now - proxyLastCheckedAt) < PROXY_STATUS_TTL_MS) {
+  // If cached as available, use full TTL. If unavailable, retry more frequently.
+  const cacheTime = proxyAvailable === false ? PROXY_FAILURE_RETRY_MS : PROXY_STATUS_TTL_MS;
+  if (!force && proxyAvailable !== null && (now - proxyLastCheckedAt) < cacheTime) {
     return proxyAvailable;
   }
   proxyLastCheckedAt = now;
@@ -105,6 +120,7 @@ async function checkProxyStatus(force = false) {
     proxyAvailable = response.ok;
     return proxyAvailable;
   } catch (err) {
+    log(`  ⚠️ Proxy health check failed: ${err.name} - ${err.message}`);
     proxyAvailable = false;
     return false;
   }
@@ -280,6 +296,12 @@ async function setInputValue(input, value, fieldName) {
 }
 
 async function selectDropdown(labelText, optionText) {
+  // Validate optionText before proceeding
+  if (!optionText || optionText.trim() === '') {
+    log(`  ⚠️ Skipping dropdown "${labelText}" - no option text provided`);
+    return false;
+  }
+
   log(`  📋 Selecting: ${labelText} → ${optionText}`);
 
   // Find label - try exact match first, then partial
@@ -379,18 +401,44 @@ function findInputByLabelText(labelText) {
 
 async function fillFieldByLabel(labelText, value) {
   if (!value && value !== 0) return false;
-  const input = findInputByLabelText(labelText);
-  if (input) {
-    return setInputValue(input, value, labelText);
+
+  try {
+    const input = findInputByLabelText(labelText);
+    if (input) {
+      return await setInputValue(input, value, labelText);
+    }
+    // Try dropdown as fallback
+    const result = await selectDropdown(labelText, value);
+    return result;
+  } catch (err) {
+    log(`  ⚠️ Error filling field "${labelText}": ${err.message}`);
+    return false;
   }
-  return selectDropdown(labelText, value);
 }
 
 function parseCustomFieldMap() {
   if (!config.customFieldMap) return {};
   try {
     const data = JSON.parse(config.customFieldMap);
-    return data && typeof data === 'object' ? data : {};
+    // Reject arrays explicitly (typeof array === 'object' is true)
+    if (Array.isArray(data)) {
+      log(`  ⚠️ Custom field map must be an object, not an array`);
+      return {};
+    }
+    // Reject non-objects
+    if (!data || typeof data !== 'object') {
+      return {};
+    }
+    // Protect against prototype pollution - create safe object
+    const safe = Object.create(null);
+    for (const [key, value] of Object.entries(data)) {
+      // Only accept string keys and primitive values
+      if (typeof key === 'string' && !key.startsWith('__proto__') &&
+          (typeof value === 'string' || typeof value === 'number' || value === null || value === undefined)) {
+        safe[key] = value;
+      }
+    }
+    return safe;
   } catch (err) {
     log(`  ⚠️ Invalid custom field map JSON: ${err.message}`);
     return {};
@@ -406,7 +454,7 @@ async function fillCustomFieldsForSection(sectionTitle) {
     await sleep(300);
     const ok = await fillFieldByLabel(label, value);
     if (!ok) {
-      log(`  ⚠️ Could not fill custom field: ${label}`);
+      log(`  ⚠️ Could not fill custom field "${label}" with value "${value}"`);
     }
   }
 }
@@ -1171,6 +1219,7 @@ async function clickNext(expectedPage) {
     if (sectionTitle && goToSectionTitle(sectionTitle)) {
       return waitForPage(expectedPage, 8000);
     }
+    log(`  ❌ Navigation failed: could not find Next button or sidebar section "${expectedPage}"`);
     return false;
   }
 
@@ -1217,6 +1266,9 @@ async function waitForPage(expectedPage, timeoutMs = 15000) {
 // ============================================
 async function runFillForm() {
   log('🚀 Starting SCE Form Auto-Fill...');
+
+  // Ensure config is loaded before proceeding
+  await loadConfig();
 
   const currentPage = detectCurrentPage();
   log(`   Current page: ${currentPage}`);
