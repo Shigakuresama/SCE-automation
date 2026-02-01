@@ -22,6 +22,7 @@ const defaultConfig = {
   attempt1Time: '2:00PM',
   attempt2Date: '01/31/2026',
   attempt2Time: '3:00PM',
+  appointmentEndTime: '',
   appointmentType: 'On-Site Appointment',
   appointmentStatus: 'Scheduled',
   gasProvider: 'SoCalGas',
@@ -65,6 +66,7 @@ function loadConfig() {
     document.getElementById('attempt1Time').value = config.attempt1Time || '';
     document.getElementById('attempt2Date').value = config.attempt2Date || '';
     document.getElementById('attempt2Time').value = config.attempt2Time || '';
+    document.getElementById('appointmentEndTime').value = config.appointmentEndTime || '';
     document.getElementById('appointmentType').value = config.appointmentType || 'On-Site Appointment';
     document.getElementById('appointmentStatus').value = config.appointmentStatus || 'Scheduled';
     document.getElementById('primaryApplicantAge').value = config.primaryApplicantAge || '44';
@@ -103,6 +105,7 @@ function saveConfig() {
     attempt1Time: document.getElementById('attempt1Time').value,
     attempt2Date: document.getElementById('attempt2Date').value,
     attempt2Time: document.getElementById('attempt2Time').value,
+    appointmentEndTime: document.getElementById('appointmentEndTime').value,
     appointmentType: 'On-Site Appointment',  // Always On-Site Appointment
     appointmentStatus: 'Scheduled',  // Always Scheduled
     primaryApplicantAge: document.getElementById('primaryApplicantAge').value,

@@ -27,6 +27,7 @@ let config = {
   attempt1Time: '2:00PM',
   attempt2Date: '01/31/2026',
   attempt2Time: '3:00PM',
+  appointmentEndTime: '',
   appointmentType: 'On-Site Appointment',
   appointmentStatus: 'Scheduled',
   gasProvider: 'SoCalGas',
@@ -1028,8 +1029,14 @@ async function createAppointment() {
   // Set Start Time
   await selectDropdown('Start Time', config.attempt1Time);
 
-  // Set End Time (1 hour after start)
-  await selectDropdown('End Time', config.attempt2Time);
+  // Set End Time (use config if provided, else +1 hour)
+  const endTime = config.appointmentEndTime
+    || (globalThis.SCEAutoFillUtils?.addHoursToTime
+      ? globalThis.SCEAutoFillUtils.addHoursToTime(config.attempt1Time, 1)
+      : config.attempt2Time);
+  if (endTime) {
+    await selectDropdown('End Time', endTime);
+  }
 
   log('✅ Appointment created!');
   return true;
