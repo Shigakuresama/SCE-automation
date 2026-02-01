@@ -1,0 +1,27 @@
+# Node.js
+node_modules/
+package-lock.json
+
+# Authentication (sensitive!)
+auth/
+*.json
+!config.json
+!package.json
+
+# Output files
+output/
+screenshots/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+# Video recordings
+*.webm
+# Video recordings
+*.webm

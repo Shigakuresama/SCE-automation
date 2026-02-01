@@ -1,0 +1,21 @@
+{
+  "name": "sce-rebate-automation",
+  "version": "1.0.0",
+  "description": "Automated SCE Rebate Center workflow with Zillow integration",
+  "type": "module",
+  "scripts": {
+    "install": "playwright install chromium",
+    "autofill": "node autofill.js",
+    "scrape": "node scrape-zillow.js",
+    "full": "node full-workflow.js",
+    "validate": "node tools/validate.js",
+    "map-fields": "node tools/field-mapper.js",
+    "cache-stats": "node autofill.js --cache-stats",
+    "cache-list": "node autofill.js --cache-list",
+    "cache-clear": "node autofill.js --cache-clear",
+    "cache-cleanup": "node autofill.js --cache-cleanup"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

@@ -1,0 +1,81 @@
+#sce-autofill-banner {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 999999;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: all 0.3s ease;
+  max-width: 350px;
+}
+
+.sce-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.sce-banner-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+}
+
+.sce-btn {
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sce-btn-primary {
+  background: #4CAF50;
+  color: white;
+}
+
+.sce-btn-primary:hover {
+  background: #45a049;
+  transform: scale(1.05);
+}
+
+.sce-btn-secondary {
+  background: #f5f5f5;
+  color: #666;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sce-btn-secondary:hover {
+  background: #e0e0e0;
+}
+
+#sce-autofill-banner.sce-filling {
+  background: #e3f2fd;
+}
+
+#sce-autofill-banner.sce-filling .sce-banner-text::after {
+  content: ' (filling...)';
+  font-weight: normal;
+}
+
+#sce-autofill-banner.sce-success {
+  background: #e8f5e9;
+  animation: sceSuccess 0.5s ease;
+}
+
+@keyframes sceSuccess {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}

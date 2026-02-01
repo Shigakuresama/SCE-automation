@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>SCE Auto-Fill Settings</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 32px 16px;
+      background: #f5f5f5;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .card h3 {
+      margin-top: 0;
+      color: #4CAF50;
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #555;
+      font-size: 14px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #4CAF50;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    #status {
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 16px;
+      display: none;
+    }
+
+    #status.success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      display: block;
+    }
+
+    .helper {
+      font-size: 12px;
+      color: #888;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>⚙️ SCE Auto-Fill Settings</h1>
+
+  <div class="card">
+    <h3>🔍 Customer Search</h3>
+
+    <div class="field">
+      <label>Street Address</label>
+      <input type="text" id="address" placeholder="22216 Seine">
+      <div class="helper">Default address for customer search</div>
+    </div>
+
+    <div class="field">
+      <label>Zip Code</label>
+      <input type="text" id="zipCode" placeholder="90716">
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>👤 Contact Information</h3>
+
+    <div class="field">
+      <label>First Name</label>
+      <input type="text" id="firstName">
+    </div>
+
+    <div class="field">
+      <label>Title</label>
+      <input type="text" id="title">
+    </div>
+
+    <div class="field">
+      <label>Phone</label>
+      <input type="text" id="phone" placeholder="7143912727">
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📋 Form Defaults</h3>
+
+    <div class="field">
+      <label>Preferred Contact Time</label>
+      <input type="text" id="preferredContactTime" placeholder="1:00PM - 3:30PM">
+    </div>
+
+    <div class="field">
+      <label>Language</label>
+      <select id="language">
+        <option value="Spanish">Spanish</option>
+        <option value="English">English</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Household Units</label>
+      <select id="householdUnits">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Space Or Unit</label>
+      <input type="text" id="spaceOrUnit" placeholder="1">
+    </div>
+
+    <div class="field">
+      <label>How did you hear about the program?</label>
+      <select id="howDidYouHear">
+        <option value="Contractor Outreach">Contractor Outreach</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Building Type</label>
+      <select id="buildingType">
+        <option value="Residential">Residential</option>
+        <option value="Residential mobile home">Residential mobile home</option>
+        <option value="Single Family Detached">Single Family Detached</option>
+        <option value="Single Family Attached">Single Family Attached</option>
+        <option value="Multi-Family">Multi-Family</option>
+        <option value="Condo">Condo</option>
+        <option value="Townhouse">Townhouse</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Master Metered</label>
+      <select id="masterMetered">
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Homeowner or Renter/Tenant</label>
+      <select id="homeownerOrRenter" disabled>
+        <option value="Renter/Tenant" selected>Renter/Tenant (Always)</option>
+      </select>
+      <div class="helper">Always set to Renter/Tenant</div>
+    </div>
+
+    <div class="field">
+      <label>Gas Provider</label>
+      <select id="gasProvider">
+        <option value="SoCalGas">SoCalGas</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Gas Account Number</label>
+      <input type="text" id="gasAccountNumber" placeholder="1">
+    </div>
+
+    <div class="field">
+      <label>Water Utility</label>
+      <select id="waterUtility">
+        <option value="N/A">N/A</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Income Verified Date</label>
+      <input type="text" id="incomeVerifiedDate" placeholder="01/31/2026">
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>👤 Assessment Questionnaire (Phase 3)</h3>
+
+    <div class="field">
+      <label>Primary Applicant Age</label>
+      <input type="text" id="primaryApplicantAge" placeholder="44">
+    </div>
+
+    <div class="field">
+      <label>Ethnicity</label>
+      <input type="text" id="ethnicity" placeholder="Hispanic/Latino">
+    </div>
+
+    <div class="field">
+      <label>Permanently Disabled</label>
+      <select id="permanentlyDisabled">
+        <option value="No">No</option>
+        <option value="Yes">Yes</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Veteran</label>
+      <select id="veteran" disabled>
+        <option value="No" selected>No (Always)</option>
+      </select>
+      <div class="helper">Always set to No</div>
+    </div>
+
+    <div class="field">
+      <label>Native American</label>
+      <select id="nativeAmerican" disabled>
+        <option value="No" selected>No (Always)</option>
+      </select>
+      <div class="helper">Always set to No</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🏠 Property Data (Phase 3)</h3>
+
+    <div class="field">
+      <label>Total Sq.Ft. (Zillow)</label>
+      <input type="text" id="zillowSqFt" placeholder="1200">
+      <div class="helper">Leave empty to use default value</div>
+    </div>
+
+    <div class="field">
+      <label>Year Built (Zillow)</label>
+      <input type="text" id="zillowYearBuilt" placeholder="1970">
+      <div class="helper">Leave empty to use default value</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📅 Appointments</h3>
+
+    <div class="field">
+      <label>Contractor Name</label>
+      <input type="text" id="contractorName" placeholder="Sergio Corp">
+      <div class="helper">Type first few letters to search in dropdown</div>
+    </div>
+
+    <div class="field">
+      <label>Attempt 1 Date</label>
+      <input type="text" id="attempt1Date" placeholder="01/30/2026">
+    </div>
+
+    <div class="field">
+      <label>Attempt 1 Time</label>
+      <input type="text" id="attempt1Time" placeholder="2:00PM">
+    </div>
+
+    <div class="field">
+      <label>Attempt 2 Date</label>
+      <input type="text" id="attempt2Date" placeholder="01/31/2026">
+    </div>
+
+    <div class="field">
+      <label>Attempt 2 Time</label>
+      <input type="text" id="attempt2Time" placeholder="3:00PM">
+    </div>
+
+    <div class="field">
+      <label>Appointment Type</label>
+      <input type="text" id="appointmentType" placeholder="On-Site Appointment" disabled>
+      <div class="helper">Always On-Site Appointment</div>
+    </div>
+
+    <div class="field">
+      <label>Appointment Status</label>
+      <input type="text" id="appointmentStatus" placeholder="Scheduled" disabled>
+      <div class="helper">Always Scheduled</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🔧 Behavior</h3>
+
+    <div class="field">
+      <label>
+        <input type="checkbox" id="autoFillPrompt" style="width: auto;">
+        Show "Fill Form" banner on SCE pages
+      </label>
+      <div class="helper">When enabled, a banner will appear on SCE form pages offering to fill the form</div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button id="saveBtn" class="btn btn-primary">Save Settings</button>
+    <button id="resetBtn" class="btn btn-secondary">Reset to Defaults</button>
+  </div>
+
+  <div id="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>
