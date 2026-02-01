@@ -9,3 +9,4 @@ assert.strictEqual(utils.normalizeLabel('* Total Sq.Ft.'), 'Total Sq.Ft.');
 assert.strictEqual(utils.sectionTitleToKey('Enrollment Information'), 'enrollment-information');
 assert.strictEqual(utils.sectionTitleToKey('File Uploads'), 'file-uploads');
 assert.strictEqual(utils.addHoursToTime('2:00PM', 1), '3:00PM');
+assert.strictEqual(utils.addHoursToTime('11:30PM', 1), '12:30AM');

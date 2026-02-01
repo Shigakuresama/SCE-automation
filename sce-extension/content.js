@@ -82,9 +82,15 @@ let zillowData = {
 
 const PROXY_URL = 'http://localhost:3000';
 let proxyAvailable = null; // null = unknown, true = available, false = unavailable
+let proxyLastCheckedAt = 0;
+const PROXY_STATUS_TTL_MS = 30000;
 
-async function checkProxyStatus() {
-  if (proxyAvailable !== null) return proxyAvailable;
+async function checkProxyStatus(force = false) {
+  const now = Date.now();
+  if (!force && proxyAvailable !== null && (now - proxyLastCheckedAt) < PROXY_STATUS_TTL_MS) {
+    return proxyAvailable;
+  }
+  proxyLastCheckedAt = now;
 
   try {
     const response = await fetch(`${PROXY_URL}/api/health`, {
@@ -475,12 +481,7 @@ async function fillCustomerSearch(address, zipCode) {
   }
 
   if (addressInput) {
-    addressInput.focus();
-    addressInput.click();
-    addressInput.value = address;
-    addressInput.dispatchEvent(new Event('input', { bubbles: true }));
-    addressInput.dispatchEvent(new Event('change', { bubbles: true }));
-    log(`  ✓ Address: ${address}`);
+    await setInputValue(addressInput, address, 'Street Address');
   } else {
     log('  ⚠️ Address field not found');
     return false;
@@ -501,12 +502,7 @@ async function fillCustomerSearch(address, zipCode) {
   }
 
   if (zipInput) {
-    zipInput.focus();
-    zipInput.click();
-    zipInput.value = zipCode;
-    zipInput.dispatchEvent(new Event('input', { bubbles: true }));
-    zipInput.dispatchEvent(new Event('change', { bubbles: true }));
-    log(`  ✓ Zip Code: ${zipCode}`);
+    await setInputValue(zipInput, zipCode, 'Zip Code');
   } else {
     log('  ⚠️ Zip Code field not found');
   }
@@ -941,7 +937,17 @@ async function createAppointment() {
   await sleep(1500);
 
   // Click the "+" button to add new appointment
-  const addBtn = document.querySelector('div.measure__btns mat-icon, button mat-icon:has-text("add")');
+  const addBtn = (() => {
+    const iconMatches = Array.from(document.querySelectorAll('button mat-icon, mat-icon, i.material-icons'));
+    const icon = iconMatches.find((el) => (el.textContent || '').trim().toLowerCase() === 'add');
+    if (icon) return icon.closest('button') || icon;
+    const textButton = Array.from(document.querySelectorAll('button')).find((btn) => {
+      const text = btn.textContent.trim().toLowerCase();
+      return text === 'add' || text.includes('add appointment') || text === '+';
+    });
+    return textButton || null;
+  })();
+
   if (addBtn) {
     addBtn.click();
     log('  ✓ Clicked add appointment button');
