@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "SCE Form Auto-Fill",
+  "version": "1.0.0",
+  "description": "Automatically fill SCE Rebate Center forms",
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://sce.dsmcentral.com/*",
+    "https://sce-trade-ally-community.my.site.com/*",
+    "http://localhost:3000/*",
+    "http://localhost:8080/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://sce.dsmcentral.com/*",
+        "https://sce-trade-ally-community.my.site.com/*",
+        "http://localhost:8080/*"
+      ],
+      "js": ["utils.js", "content.js"],
+      "css": ["banner.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "options_page": "options.html",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
