@@ -39,6 +39,10 @@ let config = {
   nativeAmerican: 'No',
   incomeVerifiedDate: '01/31/2026',
   autoFillPrompt: true,
+  householdMembers: [
+    { name: '', age: '' }
+  ],
+  customFieldMap: '{}',
   // Phase 3: Zillow data (will be scraped when needed)
   zillowSqFt: '',
   zillowYearBuilt: ''
@@ -357,6 +361,53 @@ async function selectDropdown(labelText, optionText) {
     matSelect.click();
     await sleep(400);
     return false;
+  }
+}
+
+function findInputByLabelText(labelText) {
+  const labels = Array.from(document.querySelectorAll('mat-label'));
+  const normalized = normalizeLabel(labelText);
+  const label = labels.find(l => normalizeLabel(l.textContent) === normalized)
+    || labels.find(l => normalizeLabel(l.textContent).includes(normalized));
+  if (!label) return null;
+  const formField = label.closest('mat-form-field');
+  if (!formField) return null;
+  return formField.querySelector('input.mat-input-element')
+    || formField.querySelector('input.mat-input')
+    || formField.querySelector('input');
+}
+
+async function fillFieldByLabel(labelText, value) {
+  if (!value && value !== 0) return false;
+  const input = findInputByLabelText(labelText);
+  if (input) {
+    return setInputValue(input, value, labelText);
+  }
+  return selectDropdown(labelText, value);
+}
+
+function parseCustomFieldMap() {
+  if (!config.customFieldMap) return {};
+  try {
+    const data = JSON.parse(config.customFieldMap);
+    return data && typeof data === 'object' ? data : {};
+  } catch (err) {
+    log(`  ⚠️ Invalid custom field map JSON: ${err.message}`);
+    return {};
+  }
+}
+
+async function fillCustomFieldsForSection(sectionTitle) {
+  const map = parseCustomFieldMap();
+  const sectionMap = map[sectionTitle] || map[normalizeLabel(sectionTitle)] || null;
+  if (!sectionMap || typeof sectionMap !== 'object') return;
+  log(`📋 Filling custom fields for ${sectionTitle}...`);
+  for (const [label, value] of Object.entries(sectionMap)) {
+    await sleep(300);
+    const ok = await fillFieldByLabel(label, value);
+    if (!ok) {
+      log(`  ⚠️ Could not fill custom field: ${label}`);
+    }
   }
 }
 
@@ -931,6 +982,39 @@ async function fillAssessmentQuestionnaire() {
 }
 
 // ============================================
+// HOUSEHOLD MEMBERS
+// ============================================
+async function fillHouseholdMembers() {
+  log('📋 Filling Household Members...');
+  await sleep(1500);
+
+  const members = Array.isArray(config.householdMembers) ? config.householdMembers : [];
+  if (members.length === 0) {
+    log('  ⚠️ No household members configured');
+    return;
+  }
+
+  for (const member of members) {
+    if (!member || (!member.name && !member.age)) continue;
+    if (member.name) {
+      await fillFieldByLabel('Name of Household Member', member.name);
+    }
+    if (member.age) {
+      await fillFieldByLabel('Household Member Age', member.age);
+    }
+
+    const addContinueBtn = Array.from(document.querySelectorAll('button'))
+      .find(b => b.textContent.includes('Add & Continue'));
+    if (addContinueBtn) {
+      addContinueBtn.click();
+      await sleep(800);
+    }
+  }
+
+  log('✅ Household Members filled!');
+}
+
+// ============================================
 // APPOINTMENTS SECTION - CREATE NEW APPOINTMENT
 // ============================================
 async function createAppointment() {
@@ -1149,6 +1233,7 @@ async function runFillForm() {
 
     case 'appointment-contact':
       await fillAppointmentContact();
+      await fillCustomFieldsForSection('Appointment Contact');
       await clickNext('assessment-questionnaire');
       await fillAssessmentQuestionnaire();
       await clickNext('measure-info');
@@ -1156,6 +1241,7 @@ async function runFillForm() {
 
     case 'assessment-questionnaire':
       await fillAssessmentQuestionnaire();
+      await fillCustomFieldsForSection('Assessment Questionnaire');
       await clickNext('measure-info');
       break;
 
@@ -1164,17 +1250,22 @@ async function runFillForm() {
       // Wait for Customer Information page
       await waitForPage('customer-information', 15000);
       await fillCustomerInfo();
+      await fillCustomFieldsForSection('Customer Information');
       await clickNext('additional-customer-info');
       await fillAdditionalCustomerInfo();
+      await fillCustomFieldsForSection('Additional Customer Information');
       await clickNext('enrollment-information');
       await clickNext('project-information');
       await fillProjectInformation();
+      await fillCustomFieldsForSection('Project Information');
       await clickNext('trade-ally-information');
       await fillTradeAllyInformation();
+      await fillCustomFieldsForSection('Trade Ally Information');
       break;
 
     case 'customer-information':
       await fillCustomerInfo();
+      await fillCustomFieldsForSection('Customer Information');
       await clickNext('additional-customer-info');
       await fillAdditionalCustomerInfo();
       await clickNext('enrollment-information');
@@ -1186,6 +1277,7 @@ async function runFillForm() {
 
     case 'additional-customer-info':
       await fillAdditionalCustomerInfo();
+      await fillCustomFieldsForSection('Additional Customer Information');
       await clickNext('enrollment-information');
       await clickNext('project-information');
       await fillProjectInformation();
@@ -1194,21 +1286,40 @@ async function runFillForm() {
       break;
 
     case 'enrollment-information':
+      await fillCustomFieldsForSection('Enrollment Information');
       await clickNext('project-information');
       await fillProjectInformation();
       await clickNext('trade-ally-information');
       await fillTradeAllyInformation();
       break;
 
+    case 'household-members':
+      await fillHouseholdMembers();
+      await clickNext('project-information');
+      break;
+
     case 'project-information':
       await fillProjectInformation();
+      await fillCustomFieldsForSection('Project Information');
       await clickNext('trade-ally-information');
       await fillTradeAllyInformation();
       break;
 
     case 'trade-ally-information':
       await fillTradeAllyInformation();
+      await fillCustomFieldsForSection('Trade Ally Information');
       break;
+
+    case 'equipment-information':
+    case 'basic-enrollment-equipment':
+    case 'bonus-adjustment-measures':
+    case 'review-terms':
+    case 'file-uploads':
+    case 'review-comments': {
+      const sectionTitle = keyToSectionTitle(currentPage) || getActiveSectionTitle() || currentPage;
+      await fillCustomFieldsForSection(sectionTitle);
+      break;
+    }
 
     default:
       log('⚠️ Page not recognized for auto-fill');

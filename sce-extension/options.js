@@ -35,6 +35,10 @@ const defaultConfig = {
   incomeVerifiedDate: '01/31/2026',
   zillowSqFt: '',
   zillowYearBuilt: '',
+  householdMembers: [
+    { name: '', age: '' }
+  ],
+  customFieldMap: '{}',
   autoFillPrompt: true
 };
 
@@ -61,6 +65,10 @@ function loadConfig() {
     document.getElementById('gasAccountNumber').value = config.gasAccountNumber || '1';
     document.getElementById('waterUtility').value = config.waterUtility || 'N/A';
     document.getElementById('incomeVerifiedDate').value = config.incomeVerifiedDate || '';
+    const member1 = Array.isArray(config.householdMembers) ? config.householdMembers[0] : null;
+    document.getElementById('householdMemberName1').value = member1?.name || '';
+    document.getElementById('householdMemberAge1').value = member1?.age || '';
+    document.getElementById('customFieldMap').value = config.customFieldMap || '{}';
     document.getElementById('contractorName').value = config.contractorName || 'Sergio Corp';
     document.getElementById('attempt1Date').value = config.attempt1Date || '';
     document.getElementById('attempt1Time').value = config.attempt1Time || '';
@@ -114,6 +122,13 @@ function saveConfig() {
     nativeAmerican: 'No',  // Always No
     zillowSqFt: document.getElementById('zillowSqFt').value,
     zillowYearBuilt: document.getElementById('zillowYearBuilt').value,
+    householdMembers: [
+      {
+        name: document.getElementById('householdMemberName1').value,
+        age: document.getElementById('householdMemberAge1').value
+      }
+    ],
+    customFieldMap: document.getElementById('customFieldMap').value,
     autoFillPrompt: document.getElementById('autoFillPrompt').checked
   };
 

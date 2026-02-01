@@ -10,3 +10,4 @@ assert.strictEqual(utils.sectionTitleToKey('Enrollment Information'), 'enrollmen
 assert.strictEqual(utils.sectionTitleToKey('File Uploads'), 'file-uploads');
 assert.strictEqual(utils.addHoursToTime('2:00PM', 1), '3:00PM');
 assert.strictEqual(utils.addHoursToTime('11:30PM', 1), '12:30AM');
+assert.strictEqual(utils.normalizeLabel('* Name of Household Member'), 'Name of Household Member');
