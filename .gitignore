@@ -21,6 +21,8 @@ screenshots/
 # OS
 .DS_Store
 Thumbs.db
+# Worktrees
+.worktrees/
 # Video recordings
 *.webm
 # Video recordings
