@@ -15,9 +15,9 @@ let config = {
 
   // Customer Information
   firstName: 'Sergio',
-  lastName: 'Corp',
+  lastName: 'Correa',
   phone: '7143912727',
-  email: '', // Leave empty to generate from customer name
+  email: 'scm.energysavings@gmail.com',
 
   // Additional Customer Information
   title: 'Outreach',
@@ -56,10 +56,10 @@ let config = {
 
   // Trade Ally Information
   projectFirstName: 'Sergio',
-  projectLastName: 'Corp',
+  projectLastName: 'Correa',
   projectTitle: 'Outreach',
   projectPhone: '7143912727',
-  projectEmail: '',
+  projectEmail: 'scm.energysavings@gmail.com',
 
   // Appointment Contact
   attempt1Date: '01/30/2026',
@@ -68,7 +68,7 @@ let config = {
   attempt2Time: '3:00PM',
 
   // Appointments
-  contractorName: 'Sergio Corp',
+  contractorName: 'Sergio Correa',
   appointmentDate: '01/30/2026',
   appointmentStatus: 'Scheduled',
   appointmentType: 'On-Site Appointment',
@@ -82,7 +82,7 @@ let config = {
   refrigeratorCount: '1',
   fridge1Year: '2022',
   hasFreezer: 'No',
-  waterHeaterFuel: 'Other',
+  waterHeaterFuel: 'Natural Gas',
   waterHeaterSize: '40 Gal',
   hasDishwasher: 'No',
   hasClothesWasher: 'No',
@@ -107,7 +107,7 @@ let config = {
   priorIncentive: 'No',
 
   // Uploads
-  autoUploadDocs: 'true',
+  autoUploadDocs: 'false',
 
   // Comments
   reviewComment: '',
@@ -872,6 +872,9 @@ async function fillCustomerInfo() {
   log('📋 Filling Customer Information...');
   await sleep(1000);
 
+  // Wait for Angular stability before reading fields
+  await waitForAngularStability(2000);
+
   // First, extract the actual customer address for property lookup
   await extractCustomerAddress();
 
@@ -886,36 +889,67 @@ async function fillCustomerInfo() {
     log('  ⚠️ Customer Name not found or empty');
   }
 
-  // Copy Alternate Phone → Contact Phone
-  const altPhoneInput = findInputByMatLabel('Alternate Phone');
+  // Extract Plus 4 from Mailing Zip field (format: XXXXX-XXXX)
+  // Store globally for use in Enrollment Information
+  const mailingZipInput = findInputByMatLabel('Mailing Zip') ||
+                          findInputByMatLabel('Zip Code');
+  if (mailingZipInput && mailingZipInput.value) {
+    const zipValue = mailingZipInput.value.trim();
+    if (zipValue.includes('-')) {
+      const parts = zipValue.split('-');
+      if (parts.length === 2 && parts[1].length === 4) {
+        window.scePlus4Zip = parts[1];
+        log(`  📋 Extracted Plus 4 from Mailing Zip: ${window.scePlus4Zip}`);
+      }
+    }
+    // Also store the full mailing zip value
+    window.sceMailingZip = zipValue;
+    log(`  📋 Mailing Zip: ${zipValue}`);
+  }
+
+  // Copy Alternate Phone → Contact Phone (try multiple label variations)
+  let altPhoneInput = findInputByMatLabel('Alternate Phone');
+  if (!altPhoneInput?.value) {
+    altPhoneInput = findInputByMatLabel('Phone');
+  }
+  if (!altPhoneInput?.value) {
+    altPhoneInput = findInputByMatLabel('Mobile');
+  }
   if (altPhoneInput?.value) {
     const contactPhoneInput = findInputByMatLabel('Contact Phone');
     if (contactPhoneInput) {
       await setInputValue(contactPhoneInput, altPhoneInput.value, 'Contact Phone');
+      log(`  ✓ Copied Alternate Phone to Contact Phone: ${altPhoneInput.value}`);
     }
+  } else {
+    log('  ⚠️ Alternate Phone not found or empty');
   }
 
-  // Generate email from customer name
-  if (customerName) {
+  // Use config email if provided, otherwise generate from customer name
+  const emailToUse = config.email || '';
+  if (emailToUse) {
+    const emailInput = findInputByMatLabel('Contact Email');
+    if (emailInput) {
+      await setInputValue(emailInput, emailToUse, 'Contact Email');
+      log(`  ✓ Filled Contact Email: ${emailToUse}`);
+    }
+  } else if (customerName) {
     const email = generateEmail(customerName);
     const emailInput = findInputByMatLabel('Contact Email');
     if (emailInput) {
       await setInputValue(emailInput, email, 'Contact Email');
+      log(`  ✓ Generated Contact Email: ${email}`);
     }
+  }
 
-    // Fill Contact First/Last Name
-    const nameParts = customerName.split(' ');
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
-
-    if (firstName) {
-      const firstNameInput = findInputByMatLabel('Contact First Name');
-      if (firstNameInput) await setInputValue(firstNameInput, firstName, 'Contact First Name');
-    }
-    if (lastName) {
-      const lastNameInput = findInputByMatLabel('Contact Last Name');
-      if (lastNameInput) await setInputValue(lastNameInput, lastName, 'Contact Last Name');
-    }
+  // Fill Contact First/Last Name from config if available
+  if (config.firstName) {
+    const firstNameInput = findInputByMatLabel('Contact First Name');
+    if (firstNameInput) await setInputValue(firstNameInput, config.firstName, 'Contact First Name');
+  }
+  if (config.lastName) {
+    const lastNameInput = findInputByMatLabel('Contact Last Name');
+    if (lastNameInput) await setInputValue(lastNameInput, config.lastName, 'Contact Last Name');
   }
 
   log('✅ Customer Information filled!');
@@ -939,7 +973,7 @@ function generateEmail(name) {
 
 async function fillAdditionalCustomerInfo() {
   log('📋 Filling Additional Customer Information (Phase 3)...');
-  await sleep(800);
+  await sleep(1200);
 
   const selections = {
     'How did you hear about the program?': config.howDidYouHear,
@@ -963,11 +997,11 @@ async function fillAdditionalCustomerInfo() {
     'Native American': config.nativeAmerican
   };
 
-  // Wait for Angular stability before filling (faster)
-  await waitForAngularStability(2000);
+  // Wait for Angular stability before filling
+  await waitForAngularStability(3000);
 
   for (const [label, value] of Object.entries(selections)) {
-    await sleep(150); // Reduced from 400ms to 150ms between fields
+    await sleep(400); // Increased for better Angular stability
     const result = await selectDropdown(label, value);
     if (!result) {
       log(`  ⚠️ Skipped: ${label}`);
@@ -976,7 +1010,55 @@ async function fillAdditionalCustomerInfo() {
 
   // Fill demographic fields (now on this page too)
   for (const [label, value] of Object.entries(demographicSelections)) {
-    await sleep(150);
+    await sleep(400);
+
+    // Primary Applicant Age is a text input, not a dropdown
+    if (label === 'Primary Applicant Age') {
+      const ageLabel = Array.from(document.querySelectorAll('mat-label')).find(l =>
+        l.textContent.includes('Primary Applicant Age') || l.textContent.includes('Applicant Age')
+      );
+      if (ageLabel) {
+        const formField = ageLabel.closest('mat-form-field');
+        if (formField) {
+          const input = formField.querySelector('input');
+          if (input) {
+            await setInputValue(input, value, label);
+            log(`  ✓ Filled ${label}: ${value}`);
+            continue;
+          }
+        }
+      }
+    }
+
+    // Ethnicity might need different label matching
+    if (label === 'Ethnicity') {
+      const ethnicityLabel = Array.from(document.querySelectorAll('mat-label')).find(l =>
+        l.textContent.includes('Ethnicity') || l.textContent.includes('ethnicity')
+      );
+      if (ethnicityLabel) {
+        // Check if it's a dropdown or text input
+        const formField = ethnicityLabel.closest('mat-form-field');
+        if (formField) {
+          const select = formField.querySelector('mat-select');
+          if (select) {
+            const result = await selectDropdown('Ethnicity', value);
+            if (result) {
+              log(`  ✓ Filled Ethnicity: ${value}`);
+              continue;
+            }
+          } else {
+            const input = formField.querySelector('input');
+            if (input) {
+              await setInputValue(input, value, 'Ethnicity');
+              log(`  ✓ Filled Ethnicity: ${value}`);
+              continue;
+            }
+          }
+        }
+      }
+    }
+
+    // Try as dropdown for other fields
     const result = await selectDropdown(label, value);
     if (!result) {
       log(`  ⚠️ Skipped: ${label}`);
@@ -1130,7 +1212,7 @@ async function fillTradeAllyInformation() {
   const labels = Array.from(document.querySelectorAll('mat-label'));
   const fieldMap = [
     { labels: ['Project Contact First Name', 'Contact First Name', 'First Name'], value: config.firstName, name: 'Project Contact First Name' },
-    { labels: ['Project Contact Last Name', 'Contact Last Name', 'Last Name'], value: config.lastName || 'Corp', name: 'Project Contact Last Name' },
+    { labels: ['Project Contact Last Name', 'Contact Last Name', 'Last Name'], value: config.lastName || 'Correa', name: 'Project Contact Last Name' },
     { labels: ['Project Contact Title', 'Contact Title', 'Title'], value: config.title, name: 'Project Contact Title' },
     { labels: ['Project Contact Phone', 'Contact Phone', 'Phone Number'], value: config.phone, name: 'Project Contact Phone' },
   ];
@@ -1239,8 +1321,8 @@ async function fillAppointmentContact() {
 // ============================================
 async function fillAssessmentQuestionnaire() {
   log('📋 Filling Assessment Questionnaire / Equipment Information...');
-  await sleep(1500);
-  await waitForAngularStability(2000);
+  await sleep(2000);
+  await waitForAngularStability(3000);
 
   // Log all available labels on this page for debugging
   const allLabels = Array.from(document.querySelectorAll('mat-label')).map(l => l.textContent.trim());
@@ -1264,7 +1346,7 @@ async function fillAssessmentQuestionnaire() {
   // Fill each equipment field if the label exists
   for (const [label, value] of Object.entries(equipmentFields)) {
     if (value) {
-      await sleep(200);
+      await sleep(400); // Increased for better Angular stability
       const result = await selectDropdown(label, value);
       if (!result) {
         // Try as text input if dropdown fails
@@ -1284,19 +1366,19 @@ async function fillAssessmentQuestionnaire() {
 
   // Fill Dryer Type separately (if clothes dryer was set)
   if (config.hasClothesDryer && config.hasClothesDryer !== 'None') {
-    await sleep(200);
+    await sleep(400);
     await selectDropdown('Dryer Type', config.clothesDryerType);
   }
 
   // Fill Equipment to be Installed (if configured)
   if (config.equipmentToInstall && config.equipmentToInstall !== 'None') {
-    await sleep(200);
+    await sleep(400);
     await selectDropdown('Equipment to be Installed', config.equipmentToInstall);
   }
 
   // Fill Equipment Brand and Model if provided
   if (config.equipmentBrand) {
-    await sleep(200);
+    await sleep(400);
     const brandLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Brand') || l.textContent.includes('Manufacturer'));
     if (brandLabel) {
       const formField = brandLabel.closest('mat-form-field');
@@ -1310,7 +1392,7 @@ async function fillAssessmentQuestionnaire() {
   }
 
   if (config.equipmentModel) {
-    await sleep(200);
+    await sleep(400);
     const modelLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Model'));
     if (modelLabel) {
       const formField = modelLabel.closest('mat-form-field');
@@ -1331,10 +1413,10 @@ async function fillAssessmentQuestionnaire() {
 // ============================================
 async function fillHouseholdMembers() {
   log('📋 Filling Household Members (Measure Info)...');
-  await sleep(1500);
+  await sleep(2000);
 
   // Wait for Angular stability
-  await waitForAngularStability(2000);
+  await waitForAngularStability(3000);
 
   // Get primary applicant info from customer name stored earlier or config
   const customerName = window.sceCustomerName || '';
@@ -1351,71 +1433,143 @@ async function fillHouseholdMembers() {
 
   // If no customer name, use config values
   if (!firstName) firstName = config.firstName || 'John';
-  if (!lastName) lastName = config.lastName || 'Corp';
+  if (!lastName) lastName = config.lastName || 'Correa';
 
-  // Find the "Add" button for household members (measure button with plus icon)
-  const addMemberBtn = (() => {
-    // Try to find button with mat-icon containing "add"
-    const iconMatches = Array.from(document.querySelectorAll('button mat-icon, mat-icon, i.material-icons'));
-    const addIcon = iconMatches.find((el) => (el.textContent || '').trim().toLowerCase() === 'add');
-    if (addIcon) return addIcon.closest('button') || addIcon;
+  // Step 1: Find and click the measure button (div.measure__btns mat-icon)
+  // Based on recording: xpath//html/body/app-root/app-layouts/div/div/section/div/app-estimated/div[1]/div[1]/app-estimated-measure/div/div/div[3]/div/button[2]/span/mat-icon
+  const measureBtn = (() => {
+    // Try multiple approaches to find the measure add button
+    // Approach 1: Look in app-estimated-measure div, div[3]/div/button[2]
+    const measureContainer = document.querySelector('app-estimated-measure');
+    if (measureContainer) {
+      // Look for div with class containing "measure" and "btn"
+      const measureDivs = measureContainer.querySelectorAll('div[class*="measure"], div[class*="btn"]');
+      for (const div of measureDivs) {
+        const buttons = div.querySelectorAll('button');
+        if (buttons.length >= 2) {
+          // Second button is the add button
+          const icon = buttons[1].querySelector('mat-icon');
+          if (icon && icon.textContent.trim().toLowerCase() === 'add') {
+            log('  📍 Found measure add button via container');
+            return buttons[1];
+          }
+        }
+      }
+    }
 
-    // Try by text content
-    const textButton = Array.from(document.querySelectorAll('button')).find((btn) => {
-      const text = btn.textContent.trim().toLowerCase();
-      return text === 'add' || text.includes('add');
-    });
-    return textButton || null;
+    // Approach 2: Look for any button with "add" icon in the page
+    const allButtons = Array.from(document.querySelectorAll('button'));
+    for (const btn of allButtons) {
+      const icon = btn.querySelector('mat-icon');
+      if (icon && icon.textContent.trim().toLowerCase() === 'add') {
+        // Make sure it's not in the dialog overlay
+        const overlay = btn.closest('div.cdk-overlay-container');
+        if (!overlay) {
+          log('  📍 Found measure add button via icon search');
+          return btn;
+        }
+      }
+    }
+
+    return null;
   })();
 
-  if (addMemberBtn) {
-    addMemberBtn.click();
-    log('  ✓ Clicked Add Household Member button');
-    await sleep(800);
+  if (measureBtn) {
+    measureBtn.click();
+    log('  ✓ Clicked Measure Add button');
+    await sleep(1500);
   } else {
-    log('  ⚠️ Add Household Member button not found');
-    return;
+    log('  ⚠️ Measure Add button not found - trying to find dialog directly');
+    // Try to proceed anyway - dialog might already be open
   }
 
-  // Fill Name of Household Member (use full name)
-  await sleep(300);
+  // Step 2: Click on a checkbox to select the measure (in dialog)
+  await sleep(500);
+  // Look for checkbox in the dialog overlay
+  const dialog = document.querySelector('div.cdk-overlay-container app-estimated-measure-products, app-estimated-measure-products');
+  if (dialog) {
+    log('  📍 Found products dialog');
+    // Find the first checkbox
+    const checkbox = dialog.querySelector('mat-checkbox');
+    if (checkbox) {
+      // Click on the label > div (as per recording)
+      const labelDiv = checkbox.querySelector('label > div');
+      if (labelDiv) {
+        labelDiv.click();
+        log('  ✓ Clicked measure checkbox');
+      } else {
+        // Fallback: click the checkbox label
+        const label = checkbox.querySelector('label');
+        if (label) label.click();
+        log('  ✓ Clicked measure checkbox (fallback)');
+      }
+      await sleep(500);
+    }
+  }
+
+  // Step 3: Click "Add & Continue" button (in dialog)
+  await sleep(500);
+  const addContinueBtn = (() => {
+    // Look in the dialog first
+    if (dialog) {
+      const btn = dialog.querySelector('button');
+      if (btn && (btn.textContent.includes('Add & Continue') || btn.textContent.includes('Add and Continue'))) {
+        return btn;
+      }
+    }
+    // Fallback: search globally
+    const buttons = Array.from(document.querySelectorAll('button'));
+    return buttons.find(b => b.textContent.includes('Add & Continue') || b.textContent.includes('Add and Continue'));
+  })();
+
+  if (addContinueBtn) {
+    addContinueBtn.click();
+    log('  ✓ Clicked Add & Continue');
+    await sleep(1500);
+  } else {
+    log('  ⚠️ Add & Continue button not found');
+  }
+
+  // Step 4: Fill Name of Household Member (use full name)
+  await sleep(500);
   const fullName = `${firstName} ${lastName}`.trim();
-  const nameLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Name of Household Member'));
+  const nameLabel = Array.from(document.querySelectorAll('mat-label')).find(l =>
+    l.textContent.includes('Name of Household Member') ||
+    l.textContent.includes('Household Member Name')
+  );
   if (nameLabel) {
     const formField = nameLabel.closest('mat-form-field');
     if (formField) {
       const input = formField.querySelector('input');
       if (input) {
         await setInputValue(input, fullName, 'Name of Household Member');
+        log(`  ✓ Filled Name: ${fullName}`);
       }
     }
   }
 
-  // Select "Applicant" for Relation to Applicant
-  await sleep(300);
-  await selectDropdown('Relation to Applicant', 'Applicant');
+  // Step 5: Select "Applicant" for Relation to Applicant
+  await sleep(500);
+  const relationResult = await selectDropdown('Relation to Applicant', 'Applicant');
+  if (relationResult) {
+    log('  ✓ Selected Relation: Applicant');
+  }
 
-  // Fill Household Member Age (same as primary applicant)
-  await sleep(300);
-  const ageLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Household Member Age'));
+  // Step 6: Fill Household Member Age (same as primary applicant)
+  await sleep(500);
+  const ageLabel = Array.from(document.querySelectorAll('mat-label')).find(l =>
+    l.textContent.includes('Household Member Age') ||
+    l.textContent.includes('Member Age')
+  );
   if (ageLabel) {
     const formField = ageLabel.closest('mat-form-field');
     if (formField) {
       const input = formField.querySelector('input');
       if (input) {
         await setInputValue(input, primaryAge, 'Household Member Age');
+        log(`  ✓ Filled Age: ${primaryAge}`);
       }
     }
-  }
-
-  // Click "Add & Continue" button
-  await sleep(500);
-  const addContinueBtn = Array.from(document.querySelectorAll('button'))
-    .find(b => b.textContent.includes('Add & Continue'));
-  if (addContinueBtn) {
-    addContinueBtn.click();
-    log('  ✓ Clicked Add & Continue');
-    await sleep(800);
   }
 
   log('✅ Household Members filled!');
@@ -1541,7 +1695,7 @@ async function fillEnrollmentInformation() {
   await sleep(1500);
 
   // Wait for Angular stability
-  await waitForAngularStability(2000);
+  await waitForAngularStability(3000);
 
   // Fill Income Verified Date
   const incomeDateLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Income Verified'));
@@ -1556,42 +1710,80 @@ async function fillEnrollmentInformation() {
   }
 
   // Select "PRISM code" for Income Verification Type (always)
-  await sleep(300);
+  await sleep(500);
   const result = await selectDropdown('Income Verification Type', 'PRISM code');
   if (result) {
     log('  ✓ Selected PRISM code for Income Verification Type');
-    await sleep(500);
+  }
+  await sleep(800);
 
-    // Get last 4 digits of zip code from customer info (stored in config.zipCode)
-    const zipCode = config.zipCode || '';
-    const last4Zip = zipCode.slice(-4);
+  // Get Plus 4 from:
+  // 1. Global variable (extracted from Mailing Zip on Customer Info page)
+  // 2. Config override
+  let plus4Zip = config.plus4Zip || window.scePlus4Zip || '';
 
-    if (last4Zip) {
-      // Find and fill "Enter Plus 4" field with last 4 zip digits
-      const plus4Label = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Plus 4') || l.textContent.includes('Enter Plus'));
-      if (plus4Label) {
-        const formField = plus4Label.closest('mat-form-field');
-        if (formField) {
-          const input = formField.querySelector('input');
-          if (input) {
-            await setInputValue(input, last4Zip, 'Enter Plus 4');
-            log(`  ✓ Filled Plus 4 with last 4 of zip: ${last4Zip}`);
-          }
-        }
-      }
-
-      // Click the sync save button (mat-icon="backup")
-      await sleep(300);
-      const syncSaveBtn = document.querySelector('button mat-icon[fonticon="backup"], mat-icon[fonticon="backup"], button:has(mat-icon[fonticon="backup"])');
-      if (syncSaveBtn) {
-        const btn = syncSaveBtn.tagName === 'BUTTON' ? syncSaveBtn : syncSaveBtn.closest('button');
-        if (btn) {
-          btn.click();
-          log('  ✓ Clicked sync save button');
-          await sleep(800);
+  // If still no plus4Zip, try to find Mailing Zip field on current page
+  if (!plus4Zip) {
+    // Look for any readonly/disabled zip field with ZIP+4 format
+    const allInputs = Array.from(document.querySelectorAll('input, textarea'));
+    for (const input of allInputs) {
+      const value = (input.value || '').trim();
+      if (value.match(/^\d{5}-\d{4}$/)) {
+        const parts = value.split('-');
+        if (parts.length === 2 && parts[1].length === 4) {
+          plus4Zip = parts[1];
+          log(`  📋 Found Plus 4 from readonly field: ${plus4Zip}`);
+          break;
         }
       }
     }
+  }
+
+  // Final fallback: use last 4 of regular zip (NOT ideal, but ensures something is filled)
+  if (!plus4Zip && config.zipCode) {
+    // Only use as fallback if zipCode is 5 digits
+    if (config.zipCode.length === 5) {
+      plus4Zip = config.zipCode.slice(-4);
+      log(`  📋 Using last 4 of zip as fallback: ${plus4Zip}`);
+    }
+  }
+
+  if (plus4Zip) {
+    log(`  📋 Filling Plus 4 zip: ${plus4Zip}`);
+    // Find and fill "Enter Plus 4" field
+    const plus4Label = Array.from(document.querySelectorAll('mat-label')).find(l =>
+      l.textContent.includes('Plus 4') ||
+      l.textContent.includes('Enter Plus') ||
+      l.textContent.includes('Plus-4') ||
+      l.textContent.includes('Plus 4')
+    );
+    if (plus4Label) {
+      const formField = plus4Label.closest('mat-form-field');
+      if (formField) {
+        const input = formField.querySelector('input');
+        if (input) {
+          await setInputValue(input, plus4Zip, 'Enter Plus 4');
+          log(`  ✓ Filled Plus 4: ${plus4Zip}`);
+          await sleep(500);
+        }
+      }
+    } else {
+      log('  ⚠️ Plus 4 field label not found');
+    }
+
+    // Click the sync save button (mat-icon="backup")
+    await sleep(300);
+    const syncSaveBtn = document.querySelector('button mat-icon[fonticon="backup"], mat-icon[fonticon="backup"], button:has(mat-icon[fonticon="backup"])');
+    if (syncSaveBtn) {
+      const btn = syncSaveBtn.tagName === 'BUTTON' ? syncSaveBtn : syncSaveBtn.closest('button');
+      if (btn) {
+        btn.click();
+        log('  ✓ Clicked sync save button');
+        await sleep(800);
+      }
+    }
+  } else {
+    log('  ⚠️ No Plus 4 zip available to fill');
   }
 
   log('✅ Enrollment Information filled!');
@@ -1839,6 +2031,83 @@ async function waitForPage(expectedPage, timeoutMs = 15000) {
 // ============================================
 // MAIN AUTOMATION
 // ============================================
+
+// Fill only the current section (for testing individual sections)
+async function runFillCurrentSectionOnly(banner) {
+  log('🚀 Filling current section only...');
+
+  // Detect current section
+  const currentPage = detectCurrentPage();
+  const activeTitle = getActiveSectionTitle();
+
+  log(`   📋 Current section: ${activeTitle} (${currentPage})`);
+
+  // Get workflow array (reference existing workflow in runFillForm)
+  const workflow = [
+    { key: 'customer-search', name: 'Customer Search', action: fillCustomerSearch },
+    { key: 'customer-information', name: 'Customer Information', action: fillCustomerInfo },
+    { key: 'additional-customer-info', name: 'Additional Customer Information', action: fillAdditionalCustomerInfo },
+    { key: 'enrollment-information', name: 'Enrollment Information', action: fillEnrollmentInformation },
+    { key: 'project-information', name: 'Project Information', action: fillProjectInformation },
+    { key: 'trade-ally-information', name: 'Trade Ally Information', action: fillTradeAllyInformation },
+    { key: 'appointment-contact', name: 'Appointment Contact', action: fillAppointmentContact },
+    { key: 'appointments', name: 'Appointments', action: fillCustomFieldsOnly },
+    { key: 'assessment-questionnaire', name: 'Assessment Questionnaire', action: fillAssessmentQuestionnaire },
+    { key: 'equipment-information', name: 'Equipment Information', action: fillCustomFieldsOnly },
+    { key: 'basic-enrollment-equipment', name: 'Basic Enrollment Equipment', action: fillCustomFieldsOnly },
+    { key: 'bonus-adjustment-measures', name: 'Bonus/Adjustment Measures', action: fillCustomFieldsOnly },
+    { key: 'review-terms', name: 'Review Terms and Conditions', action: fillCustomFieldsOnly },
+    { key: 'file-uploads', name: 'File Uploads', action: fillCustomFieldsOnly },
+    { key: 'review-comments', name: 'Review Comments', action: fillCustomFieldsOnly },
+    { key: 'measure-info', name: 'Measure Info', action: fillMeasureInfoPhase },
+    { key: 'summary-info', name: 'Summary Info', action: fillSummaryInfo },
+    { key: 'application-status', name: 'Application Status', action: acceptLead }
+  ];
+
+  // Find matching workflow entry
+  const step = workflow.find(s => s.key === currentPage);
+
+  if (!step) {
+    log('  ⚠️ Section not supported for single-fill');
+    updateBannerButtonError(banner, 'Section not supported');
+    return;
+  }
+
+  // Wait for Angular stability
+  await waitForAngularStability(3000);
+
+  // Execute the fill action for this section only
+  try {
+    if (step.action === fillCustomFieldsOnly) {
+      const sectionTitle = step.name || activeTitle;
+      await fillCustomFieldsForSection(sectionTitle);
+    } else if (step.action === fillMeasureInfoPhase) {
+      await fillHouseholdMembers();
+      await createAppointment();
+    } else if (step.action === fillCustomerSearch) {
+      await fillCustomerSearch(config.address, config.zipCode);
+    } else {
+      await step.action();
+    }
+
+    // Also fill custom fields for this section
+    const sectionTitle = step.name || activeTitle;
+    if (step.action !== fillCustomFieldsOnly && step.action !== fillCustomerSearch) {
+      await fillCustomFieldsForSection(sectionTitle);
+    }
+
+    // Show success
+    log(`✅ ${activeTitle} filled!`);
+    updateBannerButtonSuccess(banner);
+  } catch (err) {
+    log(`  ⚠️ Error: ${err.message}`);
+    updateBannerButtonError(banner, err.message);
+  } finally {
+    // Remove filling state from banner
+    banner?.classList.remove('sce-filling');
+  }
+}
+
 async function runFillForm() {
   log('🚀 Starting SCE Form Auto-Fill...');
   log('   📋 This will fill ALL sections in the sidebar...');
@@ -1871,17 +2140,15 @@ async function runFillForm() {
 
   // Find where to start in the workflow based on current page
   const currentPage = detectCurrentPage();
+  const activeSection = getActiveSectionTitle();
   log(`   Current page: ${currentPage}`);
+  log(`   📍 Sidebar active: ${activeSection}`);
 
+  // ALWAYS START FROM BEGINNING to ensure all sections are filled
+  // This prevents skipping sections when user is mid-form
   let startIndex = 0;
-  for (let i = 0; i < workflow.length; i++) {
-    if (workflow[i].key === currentPage) {
-      startIndex = i;
-      break;
-    }
-  }
 
-  log(`   ▶️ Starting from: ${workflow[startIndex].name}`);
+  log(`   ▶️ Starting from: ${workflow[startIndex].name} (beginning)`);
 
   // Execute workflow from start index
   for (let i = startIndex; i < workflow.length; i++) {
@@ -1909,7 +2176,7 @@ async function runFillForm() {
     }
 
     // Wait for page stability
-    await waitForAngularStability(3000);
+    await waitForAngularStability(4000);
 
     // Execute the action for this step
     try {
@@ -1985,18 +2252,23 @@ function showBanner() {
   const existing = document.getElementById('sce-autofill-banner');
   if (existing) existing.remove();
 
+  const activeTitle = getActiveSectionTitle();
+  const sectionBtnText = activeTitle ? `Fill: ${activeTitle}` : 'Fill: Current Page';
+
   const banner = document.createElement('div');
   banner.id = 'sce-autofill-banner';
   banner.innerHTML = `
     <div class="sce-banner-content">
       <span class="sce-banner-text">📋 SCE Form Detected</span>
-      <button id="sce-fill-btn" class="sce-btn sce-btn-primary">Fill Form</button>
-      <button id="sce-dismiss-btn" class="sce-btn sce-btn-secondary">✕</button>
+      <button id="sce-fill-all-btn" class="sce-btn sce-btn-primary">Fill All Sections</button>
+      <button id="sce-fill-section-btn" class="sce-btn sce-btn-secondary">${sectionBtnText}</button>
+      <button id="sce-dismiss-btn" class="sce-btn sce-btn-tertiary">✕</button>
     </div>
   `;
   document.body.appendChild(banner);
 
-  document.getElementById('sce-fill-btn').addEventListener('click', () => {
+  // Attach event listeners
+  document.getElementById('sce-fill-all-btn').addEventListener('click', () => {
     banner.classList.add('sce-filling');
     runFillForm().then(() => {
       banner.classList.add('sce-success');
@@ -2005,9 +2277,64 @@ function showBanner() {
     });
   });
 
+  document.getElementById('sce-fill-section-btn').addEventListener('click', () => {
+    banner.classList.add('sce-filling');
+    runFillCurrentSectionOnly(banner).then(() => {
+      // Banner stays visible, button shows success briefly
+    });
+  });
+
   document.getElementById('sce-dismiss-btn').addEventListener('click', () => {
     banner.remove();
   });
+}
+
+// ============================================
+// SECTION BUTTON HELPERS
+// ============================================
+
+// Update the section button text based on current active section
+function updateSectionButton(banner) {
+  const btn = banner?.querySelector('#sce-fill-section-btn');
+  if (!btn) return;
+
+  const activeTitle = getActiveSectionTitle();
+  if (activeTitle) {
+    btn.textContent = `Fill: ${activeTitle}`;
+    btn.disabled = false;
+  } else {
+    btn.textContent = 'Fill: Current Page';
+  }
+}
+
+// Show temporary success message on section button
+function updateBannerButtonSuccess(banner) {
+  const btn = banner?.querySelector('#sce-fill-section-btn');
+  if (!btn) return;
+
+  const originalText = btn.textContent;
+  btn.textContent = '✅ Filled!';
+  btn.classList.add('sce-success');
+
+  setTimeout(() => {
+    btn.textContent = originalText;
+    btn.classList.remove('sce-success');
+    updateSectionButton(banner); // Refresh to current section
+  }, 2000);
+}
+
+// Helper to show error on banner
+function updateBannerButtonError(banner, _message) {
+  const btn = banner?.querySelector('#sce-fill-section-btn');
+  if (!btn) return;
+
+  btn.textContent = `⚠️ Error`;
+  btn.classList.add('sce-error');
+
+  setTimeout(() => {
+    btn.classList.remove('sce-error');
+    updateSectionButton(banner);
+  }, 3000);
 }
 
 // ============================================
