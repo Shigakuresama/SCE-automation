@@ -16,7 +16,9 @@
     'Review Terms and Conditions': 'review-terms',
     'File Uploads': 'file-uploads',
     'Review Comments': 'review-comments',
-    'Application Status': 'application-status'
+    'Application Status': 'application-status',
+    'Measure Info': 'measure-info',
+    'Summary Info': 'summary-info'
   };
 
   // Create reverse lookup map (key -> title) once

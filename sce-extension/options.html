@@ -6,7 +6,7 @@
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 600px;
+      max-width: 800px;
       margin: 0 auto;
       padding: 32px 16px;
       background: #f5f5f5;
@@ -15,6 +15,49 @@
     h1 {
       color: #333;
       margin-bottom: 24px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: white;
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      overflow-x: auto;
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      flex: 0 0 auto;
+      min-width: 100px;
+      padding: 10px 14px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      color: #666;
+      transition: all 0.2s;
+    }
+
+    .tab:hover {
+      background: #f0f0f0;
+    }
+
+    .tab.active {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
     }
 
     .card {
@@ -28,10 +71,11 @@
     .card h3 {
       margin-top: 0;
       color: #4CAF50;
+      font-size: 16px;
     }
 
     .field {
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     label {
@@ -39,10 +83,10 @@
       font-weight: 600;
       margin-bottom: 6px;
       color: #555;
-      font-size: 14px;
+      font-size: 13px;
     }
 
-    input, select {
+    input, select, textarea {
       width: 100%;
       padding: 10px 12px;
       border: 1px solid #ddd;
@@ -51,7 +95,7 @@
       box-sizing: border-box;
     }
 
-    input:focus, select:focus {
+    input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: #4CAF50;
     }
@@ -95,280 +139,833 @@
       display: block;
     }
 
+    #status.error {
+      background: #ffebee;
+      color: #c62828;
+      display: block;
+    }
+
     .helper {
-      font-size: 12px;
+      font-size: 11px;
       color: #888;
       margin-top: 4px;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .field-row-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .section-desc {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 16px;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
   <h1>⚙️ SCE Auto-Fill Settings</h1>
 
-  <div class="card">
-    <h3>🔍 Customer Search</h3>
+  <!-- Tabs - matching sidebar sections -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('customer-search')">Search</button>
+    <button class="tab" onclick="switchTab('customer-info')">Customer Info</button>
+    <button class="tab" onclick="switchTab('additional-info')">Additional</button>
+    <button class="tab" onclick="switchTab('enrollment')">Enrollment</button>
+    <button class="tab" onclick="switchTab('household')">Household</button>
+    <button class="tab" onclick="switchTab('project')">Project</button>
+    <button class="tab" onclick="switchTab('trade-ally')">Trade Ally</button>
+    <button class="tab" onclick="switchTab('appointment')">Appt Contact</button>
+    <button class="tab" onclick="switchTab('appointments')">Appointments</button>
+    <button class="tab" onclick="switchTab('assessment')">Assessment</button>
+    <button class="tab" onclick="switchTab('equipment')">Equipment</button>
+    <button class="tab" onclick="switchTab('basic-enrollment')">Basic Enroll</button>
+    <button class="tab" onclick="switchTab('bonus')">Bonus</button>
+    <button class="tab" onclick="switchTab('terms')">Terms</button>
+    <button class="tab" onclick="switchTab('uploads')">Uploads</button>
+    <button class="tab" onclick="switchTab('comments')">Comments</button>
+    <button class="tab" onclick="switchTab('status')">Status</button>
+    <button class="tab" onclick="switchTab('behavior')">Behavior</button>
+  </div>
 
-    <div class="field">
-      <label>Street Address</label>
-      <input type="text" id="address" placeholder="22216 Seine">
-      <div class="helper">Default address for customer search</div>
-    </div>
+  <!-- Tab: Customer Search -->
+  <div id="customer-search" class="tab-content active">
+    <div class="card">
+      <h3>🔍 Customer Search</h3>
+      <div class="section-desc">Default search values for finding customers</div>
 
-    <div class="field">
-      <label>Zip Code</label>
-      <input type="text" id="zipCode" placeholder="90716">
+      <div class="field">
+        <label>Street Address</label>
+        <input type="text" id="address" value="22216 Seine">
+      </div>
+
+      <div class="field">
+        <label>Zip Code</label>
+        <input type="text" id="zipCode" value="90716">
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <h3>👤 Contact Information</h3>
+  <!-- Tab: Customer Information -->
+  <div id="customer-info" class="tab-content">
+    <div class="card">
+      <h3>👤 Customer Information</h3>
+      <div class="section-desc">Customer details (usually auto-filled from search)</div>
 
-    <div class="field">
-      <label>First Name</label>
-      <input type="text" id="firstName">
-    </div>
+      <div class="field">
+        <label>Contact First Name (for auto-fill)</label>
+        <input type="text" id="firstName" value="Sergio">
+      </div>
 
-    <div class="field">
-      <label>Title</label>
-      <input type="text" id="title">
-    </div>
+      <div class="field">
+        <label>Contact Last Name (for auto-fill)</label>
+        <input type="text" id="lastName" value="Corp">
+      </div>
 
-    <div class="field">
-      <label>Phone</label>
-      <input type="text" id="phone" placeholder="7143912727">
-    </div>
-  </div>
+      <div class="field">
+        <label>Contact Phone</label>
+        <input type="text" id="phone" value="7143912727">
+      </div>
 
-  <div class="card">
-    <h3>📋 Form Defaults</h3>
-
-    <div class="field">
-      <label>Preferred Contact Time</label>
-      <input type="text" id="preferredContactTime" placeholder="1:00PM - 3:30PM">
-    </div>
-
-    <div class="field">
-      <label>Language</label>
-      <select id="language">
-        <option value="Spanish">Spanish</option>
-        <option value="English">English</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Household Units</label>
-      <select id="householdUnits">
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Space Or Unit</label>
-      <input type="text" id="spaceOrUnit" placeholder="1">
-    </div>
-
-    <div class="field">
-      <label>How did you hear about the program?</label>
-      <select id="howDidYouHear">
-        <option value="Contractor Outreach">Contractor Outreach</option>
-        <option value="Other">Other</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Building Type</label>
-      <select id="buildingType">
-        <option value="Residential">Residential</option>
-        <option value="Residential mobile home">Residential mobile home</option>
-        <option value="Single Family Detached">Single Family Detached</option>
-        <option value="Single Family Attached">Single Family Attached</option>
-        <option value="Multi-Family">Multi-Family</option>
-        <option value="Condo">Condo</option>
-        <option value="Townhouse">Townhouse</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Master Metered</label>
-      <select id="masterMetered">
-        <option value="Yes">Yes</option>
-        <option value="No">No</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Homeowner or Renter/Tenant</label>
-      <select id="homeownerOrRenter" disabled>
-        <option value="Renter/Tenant" selected>Renter/Tenant (Always)</option>
-      </select>
-      <div class="helper">Always set to Renter/Tenant</div>
-    </div>
-
-    <div class="field">
-      <label>Gas Provider</label>
-      <select id="gasProvider">
-        <option value="SoCalGas">SoCalGas</option>
-        <option value="Other">Other</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Gas Account Number</label>
-      <input type="text" id="gasAccountNumber" placeholder="1">
-    </div>
-
-    <div class="field">
-      <label>Water Utility</label>
-      <select id="waterUtility">
-        <option value="N/A">N/A</option>
-        <option value="Other">Other</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Income Verified Date</label>
-      <input type="text" id="incomeVerifiedDate" placeholder="01/31/2026">
+      <div class="field">
+        <label>Contact Email (leave empty to use generated email)</label>
+        <input type="text" id="email" value="">
+        <div class="helper">Leave empty to auto-generate from customer name</div>
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <h3>👥 Household Members</h3>
+  <!-- Tab: Additional Customer Information -->
+  <div id="additional-info" class="tab-content">
+    <div class="card">
+      <h3>📋 Additional Customer Information</h3>
 
-    <div class="field">
-      <label>Member 1 Name</label>
-      <input type="text" id="householdMemberName1" placeholder="Maria Gonzalez">
-    </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Preferred Contact Time</label>
+          <select id="preferredContactTime">
+            <option value="8:00AM - 10:00AM">8:00AM - 10:00AM</option>
+            <option value="10:00AM - 12:00PM">10:00AM - 12:00PM</option>
+            <option value="12:00PM - 2:00PM">12:00PM - 2:00PM</option>
+            <option value="1:00PM - 3:30PM" selected>1:00PM - 3:30PM</option>
+            <option value="2:00PM - 4:00PM">2:00PM - 4:00PM</option>
+            <option value="4:00PM - 6:00PM">4:00PM - 6:00PM</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Language</label>
+          <select id="language">
+            <option value="English" selected>English</option>
+            <option value="Spanish">Spanish</option>
+          </select>
+        </div>
+      </div>
 
-    <div class="field">
-      <label>Member 1 Age</label>
-      <input type="text" id="householdMemberAge1" placeholder="43">
+      <div class="field-row">
+        <div class="field">
+          <label>Household Units</label>
+          <select id="householdUnits">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5+</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Space Or Unit</label>
+          <input type="text" id="spaceOrUnit" value="1">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>How did you hear about the program?</label>
+          <select id="howDidYouHear">
+            <option value="Contractor Outreach" selected>Contractor Outreach</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Building Type</label>
+          <select id="buildingType">
+            <option value="Residential" selected>Residential</option>
+            <option value="Residential mobile home">Residential mobile home</option>
+            <option value="Single Family Detached">Single Family Detached</option>
+            <option value="Single Family Attached">Single Family Attached</option>
+            <option value="Multi-Family">Multi-Family</option>
+            <option value="Condo">Condo</option>
+            <option value="Townhouse">Townhouse</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Master Metered</label>
+          <select id="masterMetered">
+            <option value="Yes" selected>Yes</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Homeowner or Renter/Tenant</label>
+          <select id="homeownerStatus">
+            <option value="Renter/Tenant" selected>Renter/Tenant</option>
+            <option value="Homeowner">Homeowner</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Gas Provider</label>
+          <select id="gasProvider">
+            <option value="SoCalGas" selected>SoCalGas</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Gas Account Number</label>
+          <input type="text" id="gasAccountNumber" value="1">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Water Utility</label>
+          <select id="waterUtility">
+            <option value="N/A" selected>N/A</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Income Verified Date</label>
+          <input type="text" id="incomeVerifiedDate" value="01/31/2026">
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 16px;">
+        <h3>👥 Demographics (Additional Info Page)</h3>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Primary Applicant Age</label>
+            <input type="text" id="primaryApplicantAge" value="44">
+          </div>
+          <div class="field">
+            <label>Ethnicity</label>
+            <select id="ethnicity">
+              <option value="Hispanic/Latino" selected>Hispanic/Latino</option>
+              <option value="White">White</option>
+              <option value="Black/African American">Black/African American</option>
+              <option value="Asian">Asian</option>
+              <option value="American Indian/Alaska Native">American Indian/Alaska Native</option>
+              <option value="Decline to state">Decline to state</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Permanently Disabled</label>
+            <select id="permanentlyDisabled">
+              <option value="No" selected>No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Veteran</label>
+            <select id="veteran">
+              <option value="No" selected>No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Native American</label>
+          <select id="nativeAmerican">
+            <option value="No" selected>No</option>
+            <option value="Yes">Yes</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <h3>👤 Assessment Questionnaire (Phase 3)</h3>
+  <!-- Tab: Enrollment Information -->
+  <div id="enrollment" class="tab-content">
+    <div class="card">
+      <h3>📝 Enrollment Information</h3>
 
-    <div class="field">
-      <label>Primary Applicant Age</label>
-      <input type="text" id="primaryApplicantAge" placeholder="44">
-    </div>
+      <div class="field">
+        <label>Income Verification Type</label>
+        <select id="incomeVerificationType">
+          <option value="PRISM code" selected>PRISM code</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
 
-    <div class="field">
-      <label>Ethnicity</label>
-      <input type="text" id="ethnicity" placeholder="Hispanic/Latino">
-    </div>
-
-    <div class="field">
-      <label>Permanently Disabled</label>
-      <select id="permanentlyDisabled">
-        <option value="No">No</option>
-        <option value="Yes">Yes</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Veteran</label>
-      <select id="veteran" disabled>
-        <option value="No" selected>No (Always)</option>
-      </select>
-      <div class="helper">Always set to No</div>
-    </div>
-
-    <div class="field">
-      <label>Native American</label>
-      <select id="nativeAmerican" disabled>
-        <option value="No" selected>No (Always)</option>
-      </select>
-      <div class="helper">Always set to No</div>
+      <div class="field">
+        <label>Enter Plus 4 (last 4 of zip)</label>
+        <input type="text" id="plus4Zip" placeholder="Auto-filled from zip code">
+        <div class="helper">Auto-filled from last 4 digits of zip code</div>
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <h3>🏠 Property Data (Phase 3)</h3>
+  <!-- Tab: Household Members -->
+  <div id="household" class="tab-content">
+    <div class="card">
+      <h3>👨‍👩‍👧‍👦 Household Members</h3>
 
-    <div class="field">
-      <label>Total Sq.Ft. (Zillow)</label>
-      <input type="text" id="zillowSqFt" placeholder="1200">
-      <div class="helper">Leave empty to use default value</div>
-    </div>
+      <div class="field">
+        <label>Number of Household Members to Add</label>
+        <select id="householdMembersCount">
+          <option value="0">None (Skip)</option>
+          <option value="1" selected>1 (Primary Applicant)</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+        <div class="helper">Primary applicant will be added with relation "Applicant"</div>
+      </div>
 
-    <div class="field">
-      <label>Year Built (Zillow)</label>
-      <input type="text" id="zillowYearBuilt" placeholder="1970">
-      <div class="helper">Leave empty to use default value</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3>📅 Appointments</h3>
-
-    <div class="field">
-      <label>Contractor Name</label>
-      <input type="text" id="contractorName" placeholder="Sergio Corp">
-      <div class="helper">Type first few letters to search in dropdown</div>
-    </div>
-
-    <div class="field">
-      <label>Attempt 1 Date</label>
-      <input type="text" id="attempt1Date" placeholder="01/30/2026">
-    </div>
-
-    <div class="field">
-      <label>Attempt 1 Time</label>
-      <input type="text" id="attempt1Time" placeholder="2:00PM">
-    </div>
-
-    <div class="field">
-      <label>Attempt 2 Date</label>
-      <input type="text" id="attempt2Date" placeholder="01/31/2026">
-    </div>
-
-    <div class="field">
-      <label>Attempt 2 Time</label>
-      <input type="text" id="attempt2Time" placeholder="3:00PM">
-    </div>
-
-    <div class="field">
-      <label>Appointment End Time</label>
-      <input type="text" id="appointmentEndTime" placeholder="3:00PM">
-      <div class="helper">Leave empty to auto-calculate (+1 hour)</div>
-    </div>
-
-    <div class="field">
-      <label>Appointment Type</label>
-      <input type="text" id="appointmentType" placeholder="On-Site Appointment" disabled>
-      <div class="helper">Always On-Site Appointment</div>
-    </div>
-
-    <div class="field">
-      <label>Appointment Status</label>
-      <input type="text" id="appointmentStatus" placeholder="Scheduled" disabled>
-      <div class="helper">Always Scheduled</div>
+      <div class="field">
+        <label>Relation to Applicant</label>
+        <select id="relationToApplicant">
+          <option value="Applicant" selected>Applicant</option>
+          <option value="Spouse">Spouse</option>
+          <option value="Child">Child</option>
+          <option value="Parent">Parent</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <h3>🔧 Behavior</h3>
+  <!-- Tab: Project Information -->
+  <div id="project" class="tab-content">
+    <div class="card">
+      <h3>🏠 Project Information</h3>
 
-    <div class="field">
-      <label>
-        <input type="checkbox" id="autoFillPrompt" style="width: auto;">
-        Show "Fill Form" banner on SCE pages
-      </label>
-      <div class="helper">When enabled, a banner will appear on SCE form pages offering to fill the form</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Total Sq.Ft. (Zillow)</label>
+          <input type="text" id="zillowSqFt" placeholder="">
+          <div class="helper">Leave empty to auto-fetch from property address</div>
+        </div>
+        <div class="field">
+          <label>Year Built (Zillow)</label>
+          <input type="text" id="zillowYearBuilt" placeholder="">
+          <div class="helper">Leave empty to auto-fetch from property address</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Space Or Unit</label>
+        <input type="text" id="projectSpaceOrUnit" value="1">
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <h3>🧩 Custom Field Mapping</h3>
-    <div class="field">
-      <label>Custom Field Map (JSON)</label>
-      <textarea id="customFieldMap" rows="6" style="width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; box-sizing: border-box;"></textarea>
-      <div class="helper">Example: {"Project Information":{"Total Sq.Ft.":"1200","Year Built":"1970"}}</div>
+  <!-- Tab: Trade Ally Information -->
+  <div id="trade-ally" class="tab-content">
+    <div class="card">
+      <h3>👤 Trade Ally Information</h3>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Project Contact First Name</label>
+          <input type="text" id="projectFirstName" value="Sergio">
+        </div>
+        <div class="field">
+          <label>Project Contact Last Name</label>
+          <input type="text" id="projectLastName" value="Corp">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Project Contact Title</label>
+          <input type="text" id="projectTitle" value="Outreach">
+        </div>
+        <div class="field">
+          <label>Project Contact Phone</label>
+          <input type="text" id="projectPhone" value="7143912727">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Project Contact Email</label>
+        <input type="text" id="projectEmail" value="">
+        <div class="helper">Leave empty to keep form default</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Appointment Contact -->
+  <div id="appointment" class="tab-content">
+    <div class="card">
+      <h3>📅 Appointment Contact</h3>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Attempt 1 Date</label>
+          <input type="text" id="attempt1Date" value="01/30/2026">
+        </div>
+        <div class="field">
+          <label>Attempt 1 Time</label>
+          <select id="attempt1Time">
+            <option value="8:00AM">8:00AM</option>
+            <option value="9:00AM">9:00AM</option>
+            <option value="10:00AM">10:00AM</option>
+            <option value="11:00AM">11:00AM</option>
+            <option value="12:00PM">12:00PM</option>
+            <option value="1:00PM">1:00PM</option>
+            <option value="2:00PM" selected>2:00PM</option>
+            <option value="3:00PM">3:00PM</option>
+            <option value="4:00PM">4:00PM</option>
+            <option value="5:00PM">5:00PM</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Attempt 2 Date</label>
+          <input type="text" id="attempt2Date" value="01/31/2026">
+        </div>
+        <div class="field">
+          <label>Attempt 2 Time</label>
+          <select id="attempt2Time">
+            <option value="8:00AM">8:00AM</option>
+            <option value="9:00AM">9:00AM</option>
+            <option value="10:00AM">10:00AM</option>
+            <option value="11:00AM">11:00AM</option>
+            <option value="12:00PM">12:00PM</option>
+            <option value="1:00PM">1:00PM</option>
+            <option value="2:00PM">2:00PM</option>
+            <option value="3:00PM" selected>3:00PM</option>
+            <option value="4:00PM">4:00PM</option>
+            <option value="5:00PM">5:00PM</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Appointments -->
+  <div id="appointments" class="tab-content">
+    <div class="card">
+      <h3>📅 Appointments Section</h3>
+
+      <div class="field">
+        <label>Contractor Name</label>
+        <input type="text" id="contractorName" value="Sergio Corp">
+        <div class="helper">Type first few letters to search in dropdown</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Appointment Date</label>
+          <input type="text" id="appointmentDate" value="01/30/2026">
+        </div>
+        <div class="field">
+          <label>Appointment Status</label>
+          <select id="appointmentStatus">
+            <option value="Scheduled" selected>Scheduled</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+            <option value="No Show">No Show</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Appointment Type</label>
+          <select id="appointmentType">
+            <option value="On-Site Appointment" selected>On-Site Appointment</option>
+            <option value="Virtual Appointment">Virtual Appointment</option>
+            <option value="Phone Call">Phone Call</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Start Time</label>
+          <select id="appointmentStartTime">
+            <option value="8:00AM">8:00AM</option>
+            <option value="9:00AM">9:00AM</option>
+            <option value="10:00AM">10:00AM</option>
+            <option value="11:00AM">11:00AM</option>
+            <option value="12:00PM">12:00PM</option>
+            <option value="1:00PM">1:00PM</option>
+            <option value="2:00PM" selected>2:00PM</option>
+            <option value="3:00PM">3:00PM</option>
+            <option value="4:00PM">4:00PM</option>
+            <option value="5:00PM">5:00PM</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>End Time (leave empty for +1 hour)</label>
+        <select id="appointmentEndTime">
+          <option value="" selected>Auto (+1 hour from start)</option>
+          <option value="9:00AM">9:00AM</option>
+          <option value="10:00AM">10:00AM</option>
+          <option value="11:00AM">11:00AM</option>
+          <option value="12:00PM">12:00PM</option>
+          <option value="1:00PM">1:00PM</option>
+          <option value="2:00PM">2:00PM</option>
+          <option value="3:00PM">3:00PM</option>
+          <option value="4:00PM">4:00PM</option>
+          <option value="5:00PM">5:00PM</option>
+          <option value="6:00PM">6:00PM</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Assessment Questionnaire -->
+  <div id="assessment" class="tab-content">
+    <div class="card">
+      <h3>📋 Assessment Questionnaire</h3>
+      <div class="section-desc">Equipment and home assessment questions</div>
+
+      <div class="card" style="margin-top: 0; padding: 16px;">
+        <h3>❄️ HVAC System</h3>
+
+        <div class="field">
+          <label>Is the existing central heating system...?</label>
+          <select id="hvacSystemType">
+            <option value="Natural Gas" selected>Natural Gas - Central Furnace</option>
+            <option value="Electric">Electric - Central Furnace</option>
+            <option value="Electric Heat Pump">Electric Heat Pump</option>
+            <option value="Gas Package Unit">Gas Package Unit</option>
+            <option value="Wall/Floor Heater">Wall/Floor Heater</option>
+            <option value="Baseboard">Baseboard</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Does the home have a Room air conditioner?</label>
+          <select id="hasRoomAC">
+            <option value="Yes">Yes - Central</option>
+            <option value="Yes - Room AC" selected>Yes - Room AC</option>
+            <option value="Yes - Mini Split">Yes - Mini Split</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Does the home have an evaporative cooler?</label>
+          <select id="hasEvapCooler">
+            <option value="Yes">Yes</option>
+            <option value="No" selected>No</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 16px; padding: 16px;">
+        <h3>🏠 Kitchen & Appliances</h3>
+
+        <div class="field">
+          <label>How many refrigerators?</label>
+          <select id="refrigeratorCount">
+            <option value="0">None</option>
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4+</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Existing Refrigerator Equipment 1 Manufacturer Year</label>
+            <input type="text" id="fridge1Year" placeholder="2022">
+          </div>
+          <div class="field">
+            <label>Does the home have a stand-alone freezer?</label>
+            <select id="hasFreezer">
+              <option value="Yes">Yes</option>
+              <option value="No" selected>No</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 16px; padding: 16px;">
+        <h3>🔥 Water Heater</h3>
+
+        <div class="field-row">
+          <div class="field">
+            <label>What is the fuel type of the water heater?</label>
+            <select id="waterHeaterFuel">
+              <option value="Natural Gas">Natural Gas</option>
+              <option value="Electric">Electric</option>
+              <option value="Propane">Propane</option>
+              <option value="Solar">Solar</option>
+              <option value="Heat Pump">Heat Pump</option>
+              <option value="Other" selected>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Water Heater Size</label>
+            <select id="waterHeaterSize">
+              <option value="30 Gal">30 Gallons</option>
+              <option value="40 Gal" selected>40 Gallons</option>
+              <option value="50 Gal">50 Gallons</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 16px; padding: 16px;">
+        <h3>🧺 Other Appliances</h3>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Does the home have a dishwasher?</label>
+            <select id="hasDishwasher">
+              <option value="Yes">Yes</option>
+              <option value="No" selected>No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Does the home have a clothes washer?</label>
+            <select id="hasClothesWasher">
+              <option value="Yes">Yes</option>
+              <option value="No" selected>No</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Does the home have a clothes dryer?</label>
+          <select id="hasClothesDryer">
+            <option value="Electric" selected>Electric</option>
+            <option value="Gas">Gas</option>
+            <option value="Electric Heat Pump">Heat Pump</option>
+            <option value="None">None</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Dryer Type (if applicable)</label>
+          <select id="clothesDryerType">
+            <option value="Electric">Electric</option>
+            <option value="Gas">Gas</option>
+            <option value="Heat Pump Dryer">Heat Pump Dryer</option>
+            <option value="110V Electric">110V Electric</option>
+            <option value="220V Electric">220V Electric</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Equipment Information -->
+  <div id="equipment" class="tab-content">
+    <div class="card">
+      <h3>❄️ Equipment Information</h3>
+      <div class="section-desc">Additional equipment details and specifications</div>
+
+      <div class="field">
+        <label>Equipment to be Installed</label>
+        <select id="equipmentToInstall">
+          <option value="None" selected>None</option>
+          <option value="Room AC">Room AC Unit</option>
+          <option value="Mini Split">Mini Split System</option>
+          <option value="Central AC">Central AC</option>
+          <option value="Heat Pump">Heat Pump</option>
+          <option value="Furnace">Furnace</option>
+          <option value="Water Heater">Water Heater</option>
+          <option value="Refrigerator">Refrigerator</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Equipment Brand</label>
+          <input type="text" id="equipmentBrand" placeholder="">
+        </div>
+        <div class="field">
+          <label>Equipment Model</label>
+          <input type="text" id="equipmentModel" placeholder="">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Basic Enrollment Equipment -->
+  <div id="basic-enrollment" class="tab-content">
+    <div class="card">
+      <h3>📦 Basic Enrollment Equipment</h3>
+      <div class="section-desc">Basic equipment measures for enrollment</div>
+
+      <div class="field">
+        <label>Measure Type</label>
+        <select id="measureType">
+          <option value="Basic" selected>Basic</option>
+          <option value="Advanced">Advanced</option>
+          <option value="Bonus">Bonus</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Equipment Quantity</label>
+        <select id="equipmentQuantity">
+          <option value="1" selected>1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5+</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Bonus/Adjustment Measures -->
+  <div id="bonus" class="tab-content">
+    <div class="card">
+      <h3>🎁 Bonus/Adjustment Measure(s)</h3>
+      <div class="section-desc">Additional bonus measures and adjustments</div>
+
+      <div class="field">
+        <label>Bonus Measure Type</label>
+        <select id="bonusMeasureType">
+          <option value="None" selected>None</option>
+          <option value="Advanced Measures">Advanced Measures</option>
+          <option value="Health & Safety">Health & Safety</option>
+          <option value="Custom">Custom</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Adjustment Notes</label>
+        <textarea id="adjustmentNotes" rows="3" placeholder="Any adjustment notes..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Review Terms and Conditions -->
+  <div id="terms" class="tab-content">
+    <div class="card">
+      <h3>📄 Review Terms and Conditions</h3>
+      <div class="section-desc">Terms acceptance and agreement settings</div>
+
+      <div class="field">
+        <label>Electronic Acceptance Terms</label>
+        <select id="electronicAcceptance">
+          <option value="I Agree" selected>I Agree</option>
+          <option value="I Disagree">I Disagree</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Did you receive incentive for this measure before?</label>
+        <select id="priorIncentive">
+          <option value="No" selected>No</option>
+          <option value="Yes">Yes</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: File Uploads -->
+  <div id="uploads" class="tab-content">
+    <div class="card">
+      <h3>📎 File Uploads</h3>
+      <div class="section-desc">Required document uploads (auto-filled if available)</div>
+
+      <div class="field">
+        <label>Auto-upload Documents (if available)</label>
+        <select id="autoUploadDocs">
+          <option value="true" selected>Yes - Auto-upload from config</option>
+          <option value="false">No - Skip uploads</option>
+        </select>
+        <div class="helper">Documents will need to be manually uploaded in most cases</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Review Comments -->
+  <div id="comments" class="tab-content">
+    <div class="card">
+      <h3>💬 Review Comments</h3>
+      <div class="section-desc">Comments and notes for review</div>
+
+      <div class="field">
+        <label>Default Review Comment</label>
+        <textarea id="reviewComment" rows="4" placeholder="Enter default review comments..."></textarea>
+        <div class="helper">This will be added to the review comments section</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Application Status -->
+  <div id="status" class="tab-content">
+    <div class="card">
+      <h3>✅ Application Status</h3>
+      <div class="section-desc">Final status and lead acceptance</div>
+
+      <div class="field">
+        <label>Auto-Accept Lead</label>
+        <select id="autoAcceptLead">
+          <option value="true" selected>Yes - Change to Accepted</option>
+          <option value="false">No - Leave as-is</option>
+        </select>
+        <div class="helper">Automatically change Lead Assigned status to Accepted</div>
+      </div>
+
+      <div class="field">
+        <label>Final Status</label>
+        <select id="finalStatus">
+          <option value="Accepted" selected>Accepted</option>
+          <option value="Pending">Pending</option>
+          <option value="Lead Assigned">Lead Assigned</option>
+          <option value="In Progress">In Progress</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Behavior (global settings) -->
+  <div id="behavior" class="tab-content">
+    <div class="card">
+      <h3>🔧 Behavior Settings</h3>
+
+      <div class="field">
+        <label>
+          <input type="checkbox" id="autoFillPrompt" style="width: auto;">
+          Show "Fill Form" banner on SCE pages
+        </label>
+        <div class="helper">When enabled, a banner will appear on SCE form pages offering to fill the form</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🧩 Custom Field Mapping (Advanced)</h3>
+      <div class="section-desc">Override any field using JSON mapping</div>
+
+      <div class="field">
+        <label>Custom Field Map (JSON)</label>
+        <textarea id="customFieldMap" rows="6" style="width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; box-sizing: border-box; font-family: monospace;"></textarea>
+        <div class="helper">Example: {"Project Information":{"Total Sq.Ft.":"1200","Year Built":"1970"}}</div>
+      </div>
     </div>
   </div>
 

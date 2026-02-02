@@ -9,43 +9,116 @@ console.log('[SCE Auto-Fill] Content script loaded');
 // CONFIG (loaded from storage)
 // ============================================
 let config = {
-  address: '123 Main St', // Placeholder - configure in options
-  zipCode: '90210', // Placeholder - configure in options
-  firstName: 'John', // Placeholder - configure in options
+  // Customer Search
+  address: '22216 Seine',
+  zipCode: '90716',
+
+  // Customer Information
+  firstName: 'Sergio',
+  lastName: 'Corp',
+  phone: '7143912727',
+  email: '', // Leave empty to generate from customer name
+
+  // Additional Customer Information
   title: 'Outreach',
-  phone: '5551234567', // Placeholder - configure in options
   preferredContactTime: '1:00PM - 3:30PM',
   language: 'English',
-  ethnicity: 'Decline to state',
+  ethnicity: 'Hispanic/Latino',
   householdUnits: '1',
   spaceOrUnit: '1',
   howDidYouHear: 'Contractor Outreach',
   masterMetered: 'Yes',
   buildingType: 'Residential',
-  contractorName: 'Your Company', // Placeholder - configure in options
-  attempt1Date: '', // Will be set dynamically
-  attempt1Time: '2:00PM',
-  attempt2Date: '', // Will be set dynamically
-  attempt2Time: '3:00PM',
-  appointmentEndTime: '',
-  appointmentType: 'On-Site Appointment',
-  appointmentStatus: 'Scheduled',
+  homeownerStatus: 'Renter/Tenant',
   gasProvider: 'SoCalGas',
-  gasAccountNumber: '', // Placeholder - configure in options
+  gasAccountNumber: '1',
   waterUtility: 'N/A',
+  incomeVerifiedDate: '01/31/2026',
+
+  // Demographics
   primaryApplicantAge: '44',
   permanentlyDisabled: 'No',
   veteran: 'No',
   nativeAmerican: 'No',
-  incomeVerifiedDate: '', // Will be set dynamically
-  autoFillPrompt: true,
-  householdMembers: [
-    { name: '', age: '' }
-  ],
-  customFieldMap: '{}',
-  // Phase 3: Zillow data (will be scraped when needed)
+
+  // Enrollment Information
+  incomeVerificationType: 'PRISM code',
+  plus4Zip: '',
+
+  // Household Members
+  householdMembersCount: '1',
+  relationToApplicant: 'Applicant',
+
+  // Project Information
   zillowSqFt: '',
-  zillowYearBuilt: ''
+  zillowYearBuilt: '',
+  projectSpaceOrUnit: '1',
+
+  // Trade Ally Information
+  projectFirstName: 'Sergio',
+  projectLastName: 'Corp',
+  projectTitle: 'Outreach',
+  projectPhone: '7143912727',
+  projectEmail: '',
+
+  // Appointment Contact
+  attempt1Date: '01/30/2026',
+  attempt1Time: '2:00PM',
+  attempt2Date: '01/31/2026',
+  attempt2Time: '3:00PM',
+
+  // Appointments
+  contractorName: 'Sergio Corp',
+  appointmentDate: '01/30/2026',
+  appointmentStatus: 'Scheduled',
+  appointmentType: 'On-Site Appointment',
+  appointmentStartTime: '2:00PM',
+  appointmentEndTime: '',
+
+  // Assessment/Equipment
+  hvacSystemType: 'Natural Gas',
+  hasRoomAC: 'Yes - Room AC',
+  hasEvapCooler: 'No',
+  refrigeratorCount: '1',
+  fridge1Year: '2022',
+  hasFreezer: 'No',
+  waterHeaterFuel: 'Other',
+  waterHeaterSize: '40 Gal',
+  hasDishwasher: 'No',
+  hasClothesWasher: 'No',
+  hasClothesDryer: 'Electric',
+  clothesDryerType: 'Electric',
+
+  // Equipment Information
+  equipmentToInstall: 'None',
+  equipmentBrand: '',
+  equipmentModel: '',
+
+  // Basic Enrollment Equipment
+  measureType: 'Basic',
+  equipmentQuantity: '1',
+
+  // Bonus Measures
+  bonusMeasureType: 'None',
+  adjustmentNotes: '',
+
+  // Terms
+  electronicAcceptance: 'I Agree',
+  priorIncentive: 'No',
+
+  // Uploads
+  autoUploadDocs: 'true',
+
+  // Comments
+  reviewComment: '',
+
+  // Status
+  autoAcceptLead: 'true',
+  finalStatus: 'Accepted',
+
+  // Behavior
+  autoFillPrompt: true,
+  customFieldMap: '{}'
 };
 
 // ============================================
@@ -81,6 +154,40 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // ============================================
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Check if a field is already filled with a valid value
+// skipIfFilled = true: skip if already filled (for dropdowns/preferences)
+// skipIfFilled = false: always fill (for property data, contact info)
+function isFieldAlreadyFilled(input, expectedValue, skipIfFilled = true) {
+  if (!input) return false;
+  if (!skipIfFilled) return false; // Always fill if skipIfFilled is false
+
+  // For readonly/disabled fields, consider them "already filled"
+  if (input.readOnly || input.disabled) return true;
+
+  // Check Angular form state classes
+  const formField = input.closest('mat-form-field');
+  if (formField) {
+    const isTouchedAndDirty = formField.classList.contains('ng-touched') && formField.classList.contains('ng-dirty');
+    const isValid = formField.classList.contains('ng-valid');
+
+    if (isTouchedAndDirty && isValid) {
+      const currentValue = input.value?.trim() || input.textContent?.trim() || '';
+      // If it has a meaningful value (more than 1 char for text inputs), consider it filled
+      if (currentValue.length > 1) {
+        return true;
+      }
+    }
+  }
+
+  // Direct value check for selects
+  const currentValue = input.value?.trim() || '';
+  if (currentValue && expectedValue && currentValue === expectedValue.trim()) {
+    return true;
+  }
+
+  return false;
 }
 
 function log(msg, ...args) {
@@ -127,8 +234,26 @@ async function checkProxyStatus(force = false) {
 }
 
 async function fetchPropertyDataFromProxy(address, zipCode) {
-  const searchAddress = `${address}, ${zipCode}`.trim();
+  // Use actual customer address if available from the page
+  const actualAddress = window.sceCustomerAddress || '';
+  let searchAddress = `${address}, ${zipCode}`.trim();
+
+  // If we have the actual customer address from the page, use that instead
+  if (actualAddress && actualAddress.includes(',')) {
+    searchAddress = actualAddress;
+    log(`  🏠 Using actual customer address from page`);
+  }
+
   log(`  🏠 Fetching property data for: ${searchAddress}`);
+
+  // Parse address and zip from the search address
+  let searchAddr = address;
+  let searchZip = zipCode;
+  if (actualAddress && actualAddress.includes(',')) {
+    const parts = actualAddress.split(',').map(p => p.trim());
+    searchAddr = parts[0] || address;
+    searchZip = parts[parts.length - 1] || zipCode;
+  }
 
   // Check cache first
   if (zillowData.lastAddress === searchAddress && zillowData.sqFt) {
@@ -149,7 +274,7 @@ async function fetchPropertyDataFromProxy(address, zipCode) {
   }
 
   try {
-    const response = await fetch(`${PROXY_URL}/api/property?address=${encodeURIComponent(address)}&zip=${encodeURIComponent(zipCode)}`);
+    const response = await fetch(`${PROXY_URL}/api/property?address=${encodeURIComponent(searchAddr)}&zip=${encodeURIComponent(searchZip)}`);
 
     if (response.ok) {
       const result = await response.json();
@@ -239,22 +364,28 @@ function findInputByMatLabel(labelText) {
     || formField.querySelector('input');
 }
 
-async function setInputValue(input, value, fieldName) {
+async function setInputValue(input, value, fieldName, skipIfFilled = true) {
   if (!input) return false;
+
+  // Check if field is already filled with the expected value (respecting skipIfFilled)
+  if (isFieldAlreadyFilled(input, value, skipIfFilled)) {
+    log(`  ⊙ ${fieldName}: already filled with "${input.value}"`);
+    return true;
+  }
 
   // Scroll into view if needed
   input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  await sleep(150);
+  await sleep(100);
 
   // Focus with click for Angular to register
   input.focus();
   input.click();
-  await sleep(200);
+  await sleep(150);
 
   // Clear existing value
   input.value = '';
   input.dispatchEvent(new Event('input', { bubbles: true }));
-  await sleep(100);
+  await sleep(50);
 
   // Set value using native setter for Angular to detect
   const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -265,10 +396,9 @@ async function setInputValue(input, value, fieldName) {
   input.dispatchEvent(new Event('change', { bubbles: true }));
   input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value.charAt(value.length - 1) || 'x' }));
   input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-  input.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
 
   // Wait for Angular to process
-  await sleep(400);
+  await sleep(300);
 
   // Verify and retry if needed
   if (input.value === value) {
@@ -278,13 +408,13 @@ async function setInputValue(input, value, fieldName) {
 
   log(`  ⚠️ Retry for ${fieldName} (current: "${input.value}")`);
   // Retry with direct assignment
-  await sleep(300);
+  await sleep(200);
   input.focus();
   input.value = value;
   input.dispatchEvent(new InputEvent('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
   input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
-  await sleep(300);
+  await sleep(200);
 
   if (input.value === value) {
     log(`  ✓ ${fieldName}: "${value}" (retry)`);
@@ -332,16 +462,26 @@ async function selectDropdown(labelText, optionText) {
     return false;
   }
 
+  // Check if already has the correct value
+  const currentValueDiv = matSelect.querySelector('.mat-select-value-text');
+  const currentValue = currentValueDiv?.textContent?.trim() || '';
+  if (currentValue.toLowerCase() === optionText.toLowerCase() ||
+      currentValue === optionText ||
+      (formField.classList.contains('ng-touched') && formField.classList.contains('ng-dirty'))) {
+    log(`  ⊙ ${labelText}: already set to "${currentValue}"`);
+    return true;
+  }
+
   // Scroll into view and click
   matSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  await sleep(200);
+  await sleep(100);
 
-  // Click select to open dropdown - try multiple methods
+  // Click select to open dropdown
   matSelect.click();
-  await sleep(800);
+  await sleep(400);
 
-  // Wait for options to render
-  await waitForAngularStability(3000);
+  // Wait for options to render (reduced from 800 to 400)
+  await waitForAngularStability(2000);
 
   // Find matching option - try exact match first (case-insensitive)
   const options = Array.from(document.querySelectorAll('mat-option'));
@@ -374,14 +514,14 @@ async function selectDropdown(labelText, optionText) {
     match.scrollIntoView({ behavior: 'smooth', block: 'center' });
     match.click();
     log(`  ✓ ${labelText}: ${optionText}`);
-    await sleep(600);
+    await sleep(300);
     return true;
   } else {
     log(`  ⚠️ Option not found: ${optionText}`);
     log(`     Available: ${options.map(o => o.textContent?.trim()).filter(Boolean).slice(0, 5).join(' | ')}`);
     // Close dropdown if no match
     matSelect.click();
-    await sleep(400);
+    await sleep(200);
     return false;
   }
 }
@@ -475,6 +615,44 @@ function getActiveSectionTitle() {
   return active?.textContent?.trim() || '';
 }
 
+// Get all available section titles from sidebar (in order)
+function getAvailableSectionTitles() {
+  const items = getSidebarSectionItems();
+  return items.map(item => {
+    const titleEl = item.querySelector('.sections-menu-item__title');
+    return titleEl?.textContent?.trim() || '';
+  }).filter(Boolean);
+}
+
+// Find the index of the current active section in the sidebar
+function getActiveSectionIndex() {
+  const items = getSidebarSectionItems();
+  return items.findIndex(item => item.classList.contains('active'));
+}
+
+// Get the next section title after the current one
+function getNextSectionTitle() {
+  const items = getSidebarSectionItems();
+  const activeIndex = getActiveSectionIndex();
+
+  // Find the next incomplete section after the current one
+  for (let i = activeIndex + 1; i < items.length; i++) {
+    const item = items[i];
+    const statusIndicator = item.querySelector('.sections-menu-item__status-indicator');
+
+    // Skip sections that are already completed (check_circle icon)
+    const isCompleted = statusIndicator?.querySelector('mat-icon[fonticon="check_circle"], mat-icon:contains("check_circle")');
+    const hasCheckIcon = statusIndicator?.textContent?.includes('check_circle');
+
+    if (!isCompleted && !hasCheckIcon) {
+      const titleEl = item.querySelector('.sections-menu-item__title');
+      return titleEl?.textContent?.trim() || '';
+    }
+  }
+
+  return null; // No more incomplete sections
+}
+
 function goToSectionTitle(title) {
   const targetTitle = normalizeLabel(title);
   const items = getSidebarSectionItems();
@@ -500,11 +678,13 @@ function keyToSectionTitle(key) {
 }
 
 // ============================================
-// PAGE DETECTION (Enhanced with SCE URL routing patterns)
+// PAGE DETECTION (Sidebar-based - more reliable)
 // ============================================
 function detectCurrentPage() {
+  // PRIORITY 1: Use sidebar active state (most reliable)
   const activeTitle = getActiveSectionTitle();
   if (activeTitle) {
+    log(`  📍 Sidebar active: ${activeTitle}`);
     return globalThis.SCEAutoFillUtils?.sectionTitleToKey
       ? globalThis.SCEAutoFillUtils.sectionTitleToKey(activeTitle)
       : 'unknown';
@@ -518,7 +698,7 @@ function detectCurrentPage() {
     '/programs?siteId=': 'programs',
     'creating=true': 'programs',
     '/measure-info/': 'measure-info',
-    '/summary-info/': 'application-status',
+    '/summary-info/': 'summary-info',
     '/equipment-info/': 'equipment-info',
     '/assessment/': 'assessment'
   };
@@ -549,7 +729,7 @@ async function fillCustomerSearch(address, zipCode) {
   log('🔍 Filling Customer Search...');
   await sleep(1000);
 
-  // Store address for Zillow lookup
+  // Store search address for Zillow lookup (will be updated with actual customer address later)
   window.sceCustomerAddress = `${address}, ${zipCode}`;
 
   // Find Street Address field (by placeholder or aria-label)
@@ -627,7 +807,62 @@ async function fillCustomerSearch(address, zipCode) {
     log('  ✓ Clicked Program button');
   }
 
+  // After navigation to Customer Information page, extract the actual customer address
+  // This will be used for property data lookup
+  await sleep(2000);
+  await extractCustomerAddress();
+
   return true;
+}
+
+// Extract actual customer address from the Customer Information page
+async function extractCustomerAddress() {
+  log('  🔍 Extracting customer address for property lookup...');
+
+  // Try to find the address fields on Customer Information page
+  const addressLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Street Address'));
+  const zipLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Zip Code'));
+
+  let customerAddress = '';
+  let customerZip = '';
+
+  if (addressLabel) {
+    const formField = addressLabel.closest('mat-form-field');
+    if (formField) {
+      const input = formField.querySelector('input');
+      if (input && input.value) {
+        customerAddress = input.value.trim();
+      }
+    }
+  }
+
+  if (zipLabel) {
+    const formField = zipLabel.closest('mat-form-field');
+    if (formField) {
+      const input = formField.querySelector('input');
+      if (input && input.value) {
+        customerZip = input.value.trim();
+      }
+    }
+  }
+
+  // Update config with actual customer address for property lookup
+  if (customerAddress) {
+    config.address = customerAddress;
+    window.sceCustomerAddress = customerAddress;
+    log(`  ✓ Customer address: ${customerAddress}`);
+  }
+
+  if (customerZip) {
+    config.zipCode = customerZip;
+    log(`  ✓ Customer zip: ${customerZip}`);
+  }
+
+  // Store combined address for Zillow lookup
+  if (customerAddress && customerZip) {
+    window.sceCustomerAddress = `${customerAddress}, ${customerZip}`;
+    log(`  ✓ Stored for property lookup: ${window.sceCustomerAddress}`);
+  }
 }
 
 // ============================================
@@ -636,6 +871,9 @@ async function fillCustomerSearch(address, zipCode) {
 async function fillCustomerInfo() {
   log('📋 Filling Customer Information...');
   await sleep(1000);
+
+  // First, extract the actual customer address for property lookup
+  await extractCustomerAddress();
 
   const nameInput = findInputByMatLabel('Customer Name');
   const customerName = nameInput?.value || '';
@@ -701,7 +939,7 @@ function generateEmail(name) {
 
 async function fillAdditionalCustomerInfo() {
   log('📋 Filling Additional Customer Information (Phase 3)...');
-  await sleep(1500);
+  await sleep(800);
 
   const selections = {
     'How did you hear about the program?': config.howDidYouHear,
@@ -716,14 +954,44 @@ async function fillAdditionalCustomerInfo() {
     'Water Utility': config.waterUtility
   };
 
-  // Wait for Angular stability before filling
-  await waitForAngularStability();
+  // Demographic fields (also on this page now)
+  const demographicSelections = {
+    'Primary Applicant Age': config.primaryApplicantAge,
+    'Ethnicity': config.ethnicity,
+    'Are there permanently disabled household members?': config.permanentlyDisabled,
+    'Veteran': config.veteran,
+    'Native American': config.nativeAmerican
+  };
+
+  // Wait for Angular stability before filling (faster)
+  await waitForAngularStability(2000);
 
   for (const [label, value] of Object.entries(selections)) {
-    await sleep(400); // Extra delay between fields
+    await sleep(150); // Reduced from 400ms to 150ms between fields
     const result = await selectDropdown(label, value);
     if (!result) {
       log(`  ⚠️ Skipped: ${label}`);
+    }
+  }
+
+  // Fill demographic fields (now on this page too)
+  for (const [label, value] of Object.entries(demographicSelections)) {
+    await sleep(150);
+    const result = await selectDropdown(label, value);
+    if (!result) {
+      log(`  ⚠️ Skipped: ${label}`);
+    }
+  }
+
+  // Fill Water Utility (text input, not dropdown)
+  const waterUtilityLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Water Utility'));
+  if (waterUtilityLabel) {
+    const formField = waterUtilityLabel.closest('mat-form-field');
+    if (formField) {
+      const input = formField.querySelector('input');
+      if (input && !input.readOnly && !input.disabled) {
+        await setInputValue(input, config.waterUtility || 'N/A', 'Water Utility', false);
+      }
     }
   }
 
@@ -802,7 +1070,7 @@ async function fillAdditionalCustomerInfo() {
 
 async function fillProjectInformation() {
   log('📋 Filling Project Information (Phase 3)...');
-  await sleep(1000);
+  await sleep(500);
 
   // Get property data from proxy (with fallback to config)
   const propertyData = await fetchPropertyDataFromProxy(
@@ -810,19 +1078,19 @@ async function fillProjectInformation() {
     config.zipCode
   );
 
-  // Space Or Unit (on this page too)
+  // Space Or Unit (on this page too) - skip if filled (doesn't come from Zillow)
   const spaceLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Space Or Unit'));
   if (spaceLabel) {
     const formField = spaceLabel.closest('mat-form-field');
     if (formField) {
       const input = formField.querySelector('input');
       if (input) {
-        await setInputValue(input, config.spaceOrUnit, 'Space Or Unit');
+        await setInputValue(input, config.spaceOrUnit, 'Space Or Unit', true);
       }
     }
   }
 
-  // Fill Total Sq.Ft. from property data
+  // Fill Total Sq.Ft. from property data - ALWAYS fill (skipIfFilled = false)
   const sqFtLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Total Sq') || l.textContent.includes('Square Foot'));
   if (sqFtLabel) {
     const formField = sqFtLabel.closest('mat-form-field');
@@ -830,12 +1098,12 @@ async function fillProjectInformation() {
       const input = formField.querySelector('input');
       if (input) {
         const sqFtValue = propertyData.sqFt || '1200';
-        await setInputValue(input, sqFtValue, 'Total Sq.Ft.');
+        await setInputValue(input, sqFtValue, 'Total Sq.Ft.', false);
       }
     }
   }
 
-  // Fill Year Built from property data
+  // Fill Year Built from property data - ALWAYS fill (skipIfFilled = false)
   const yearLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Year Built'));
   if (yearLabel) {
     const formField = yearLabel.closest('mat-form-field');
@@ -843,7 +1111,7 @@ async function fillProjectInformation() {
       const input = formField.querySelector('input');
       if (input) {
         const yearValue = propertyData.yearBuilt || '1970';
-        await setInputValue(input, yearValue, 'Year Built');
+        await setInputValue(input, yearValue, 'Year Built', false);
       }
     }
   }
@@ -862,10 +1130,9 @@ async function fillTradeAllyInformation() {
   const labels = Array.from(document.querySelectorAll('mat-label'));
   const fieldMap = [
     { labels: ['Project Contact First Name', 'Contact First Name', 'First Name'], value: config.firstName, name: 'Project Contact First Name' },
-    { labels: ['Project Contact Last Name', 'Contact Last Name', 'Last Name'], value: 'Corp', name: 'Project Contact Last Name' }, // Default last name
+    { labels: ['Project Contact Last Name', 'Contact Last Name', 'Last Name'], value: config.lastName || 'Corp', name: 'Project Contact Last Name' },
     { labels: ['Project Contact Title', 'Contact Title', 'Title'], value: config.title, name: 'Project Contact Title' },
     { labels: ['Project Contact Phone', 'Contact Phone', 'Phone Number'], value: config.phone, name: 'Project Contact Phone' },
-    { labels: ['Project Contact Email', 'Contact Email', 'Email'], value: 'sergiocorp@example.com', name: 'Project Contact Email' }
   ];
 
   let filledCount = 0;
@@ -896,28 +1163,16 @@ async function fillTradeAllyInformation() {
     }
   }
 
-  // Fallback: fill first N editable inputs if we didn't find enough by label
-  if (filledCount < 2) {
-    log('   🔄 Using fallback: filling first editable inputs...');
-    const allInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
-    const values = [
-      { value: config.firstName, name: 'First Name (fallback)' },
-      { value: 'Corp', name: 'Last Name (fallback)' },
-      { value: config.title, name: 'Title (fallback)' },
-      { value: config.phone, name: 'Phone (fallback)' }
-    ];
-
-    let filled = 0;
-    for (const input of allInputs) {
-      if (filled >= values.length) break;
-      const rect = input.getBoundingClientRect();
-      const isVisible = rect.width > 0 && rect.height > 0;
-      const isEditable = !input.readOnly && !input.disabled && !input.value;
-
-      if (isVisible && isEditable) {
-        const success = await setInputValue(input, values[filled].value, values[filled].name);
-        if (success) filled++;
-        await sleep(400);
+  // Only fill email if explicitly set in config (don't change default)
+  if (config.email) {
+    const emailLabel = labels.find(l => l.textContent.includes('Email'));
+    if (emailLabel) {
+      const formField = emailLabel.closest('mat-form-field');
+      if (formField) {
+        const input = formField.querySelector('input');
+        if (input && !input.readOnly && !input.disabled) {
+          await setInputValue(input, config.email, 'Project Contact Email');
+        }
       }
     }
   }
@@ -983,64 +1238,184 @@ async function fillAppointmentContact() {
 // ASSESSMENT QUESTIONNAIRE (Phase 3)
 // ============================================
 async function fillAssessmentQuestionnaire() {
-  log('📋 Filling Assessment Questionnaire (Phase 3)...');
+  log('📋 Filling Assessment Questionnaire / Equipment Information...');
+  await sleep(1500);
+  await waitForAngularStability(2000);
+
+  // Log all available labels on this page for debugging
+  const allLabels = Array.from(document.querySelectorAll('mat-label')).map(l => l.textContent.trim());
+  log(`  🔍 Found ${allLabels.length} labels on page`);
+
+  // Equipment fields from config
+  const equipmentFields = {
+    'Is the existing central heating system': config.hvacSystemType,
+    'Does the home have a Room air conditioner': config.hasRoomAC,
+    'Does the home have an evaporative cooler': config.hasEvapCooler,
+    'How many refrigerators': config.refrigeratorCount,
+    'Existing Refrigerator Equipment 1 Manufacturer Year': config.fridge1Year,
+    'Does the home have a stand-alone freezer': config.hasFreezer,
+    'What is the fuel type of the water heater': config.waterHeaterFuel,
+    'Water Heater Size': config.waterHeaterSize,
+    'Does the home have a dishwasher': config.hasDishwasher,
+    'Does the home have a clothes washer': config.hasClothesWasher,
+    'Does the home have a clothes dryer': config.hasClothesDryer
+  };
+
+  // Fill each equipment field if the label exists
+  for (const [label, value] of Object.entries(equipmentFields)) {
+    if (value) {
+      await sleep(200);
+      const result = await selectDropdown(label, value);
+      if (!result) {
+        // Try as text input if dropdown fails
+        const labelEl = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes(label));
+        if (labelEl) {
+          const formField = labelEl.closest('mat-form-field');
+          if (formField) {
+            const input = formField.querySelector('input');
+            if (input) {
+              await setInputValue(input, value, label);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Fill Dryer Type separately (if clothes dryer was set)
+  if (config.hasClothesDryer && config.hasClothesDryer !== 'None') {
+    await sleep(200);
+    await selectDropdown('Dryer Type', config.clothesDryerType);
+  }
+
+  // Fill Equipment to be Installed (if configured)
+  if (config.equipmentToInstall && config.equipmentToInstall !== 'None') {
+    await sleep(200);
+    await selectDropdown('Equipment to be Installed', config.equipmentToInstall);
+  }
+
+  // Fill Equipment Brand and Model if provided
+  if (config.equipmentBrand) {
+    await sleep(200);
+    const brandLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Brand') || l.textContent.includes('Manufacturer'));
+    if (brandLabel) {
+      const formField = brandLabel.closest('mat-form-field');
+      if (formField) {
+        const input = formField.querySelector('input');
+        if (input) {
+          await setInputValue(input, config.equipmentBrand, 'Equipment Brand');
+        }
+      }
+    }
+  }
+
+  if (config.equipmentModel) {
+    await sleep(200);
+    const modelLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Model'));
+    if (modelLabel) {
+      const formField = modelLabel.closest('mat-form-field');
+      if (formField) {
+        const input = formField.querySelector('input');
+        if (input) {
+          await setInputValue(input, config.equipmentModel, 'Equipment Model');
+        }
+      }
+    }
+  }
+
+  log('✅ Assessment Questionnaire / Equipment filled!');
+}
+
+// ============================================
+// HOUSEHOLD MEMBERS (Measure Info page)
+// ============================================
+async function fillHouseholdMembers() {
+  log('📋 Filling Household Members (Measure Info)...');
   await sleep(1500);
 
-  // Primary Applicant Age
-  const ageLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Primary Applicant Age'));
+  // Wait for Angular stability
+  await waitForAngularStability(2000);
+
+  // Get primary applicant info from customer name stored earlier or config
+  const customerName = window.sceCustomerName || '';
+  const primaryAge = config.primaryApplicantAge || '44';
+
+  // Split name into first and last
+  let firstName = '';
+  let lastName = '';
+  if (customerName) {
+    const nameParts = customerName.trim().split(/\s+/);
+    firstName = nameParts[0] || '';
+    lastName = nameParts.slice(1).join(' ') || '';
+  }
+
+  // If no customer name, use config values
+  if (!firstName) firstName = config.firstName || 'John';
+  if (!lastName) lastName = config.lastName || 'Corp';
+
+  // Find the "Add" button for household members (measure button with plus icon)
+  const addMemberBtn = (() => {
+    // Try to find button with mat-icon containing "add"
+    const iconMatches = Array.from(document.querySelectorAll('button mat-icon, mat-icon, i.material-icons'));
+    const addIcon = iconMatches.find((el) => (el.textContent || '').trim().toLowerCase() === 'add');
+    if (addIcon) return addIcon.closest('button') || addIcon;
+
+    // Try by text content
+    const textButton = Array.from(document.querySelectorAll('button')).find((btn) => {
+      const text = btn.textContent.trim().toLowerCase();
+      return text === 'add' || text.includes('add');
+    });
+    return textButton || null;
+  })();
+
+  if (addMemberBtn) {
+    addMemberBtn.click();
+    log('  ✓ Clicked Add Household Member button');
+    await sleep(800);
+  } else {
+    log('  ⚠️ Add Household Member button not found');
+    return;
+  }
+
+  // Fill Name of Household Member (use full name)
+  await sleep(300);
+  const fullName = `${firstName} ${lastName}`.trim();
+  const nameLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Name of Household Member'));
+  if (nameLabel) {
+    const formField = nameLabel.closest('mat-form-field');
+    if (formField) {
+      const input = formField.querySelector('input');
+      if (input) {
+        await setInputValue(input, fullName, 'Name of Household Member');
+      }
+    }
+  }
+
+  // Select "Applicant" for Relation to Applicant
+  await sleep(300);
+  await selectDropdown('Relation to Applicant', 'Applicant');
+
+  // Fill Household Member Age (same as primary applicant)
+  await sleep(300);
+  const ageLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Household Member Age'));
   if (ageLabel) {
     const formField = ageLabel.closest('mat-form-field');
     if (formField) {
       const input = formField.querySelector('input');
       if (input) {
-        await setInputValue(input, config.primaryApplicantAge, 'Primary Applicant Age');
+        await setInputValue(input, primaryAge, 'Household Member Age');
       }
     }
   }
 
-  // Ethnicity
-  await selectDropdown('Ethnicity', config.ethnicity);
-
-  // Permanently Disabled
-  await selectDropdown('Permanently Disabled', config.permanentlyDisabled);
-
-  // Veteran
-  await selectDropdown('Veteran', config.veteran);
-
-  // Native American
-  await selectDropdown('Native American', config.nativeAmerican);
-
-  log('✅ Assessment Questionnaire filled!');
-}
-
-// ============================================
-// HOUSEHOLD MEMBERS
-// ============================================
-async function fillHouseholdMembers() {
-  log('📋 Filling Household Members...');
-  await sleep(1500);
-
-  const members = Array.isArray(config.householdMembers) ? config.householdMembers : [];
-  if (members.length === 0) {
-    log('  ⚠️ No household members configured');
-    return;
-  }
-
-  for (const member of members) {
-    if (!member || (!member.name && !member.age)) continue;
-    if (member.name) {
-      await fillFieldByLabel('Name of Household Member', member.name);
-    }
-    if (member.age) {
-      await fillFieldByLabel('Household Member Age', member.age);
-    }
-
-    const addContinueBtn = Array.from(document.querySelectorAll('button'))
-      .find(b => b.textContent.includes('Add & Continue'));
-    if (addContinueBtn) {
-      addContinueBtn.click();
-      await sleep(800);
-    }
+  // Click "Add & Continue" button
+  await sleep(500);
+  const addContinueBtn = Array.from(document.querySelectorAll('button'))
+    .find(b => b.textContent.includes('Add & Continue'));
+  if (addContinueBtn) {
+    addContinueBtn.click();
+    log('  ✓ Clicked Add & Continue');
+    await sleep(800);
   }
 
   log('✅ Household Members filled!');
@@ -1159,57 +1534,273 @@ async function createAppointment() {
 }
 
 // ============================================
+// ENROLLMENT INFORMATION
+// ============================================
+async function fillEnrollmentInformation() {
+  log('📋 Filling Enrollment Information...');
+  await sleep(1500);
+
+  // Wait for Angular stability
+  await waitForAngularStability(2000);
+
+  // Fill Income Verified Date
+  const incomeDateLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Income Verified'));
+  if (incomeDateLabel) {
+    const formField = incomeDateLabel.closest('mat-form-field');
+    if (formField) {
+      const input = formField.querySelector('input');
+      if (input && config.incomeVerifiedDate) {
+        await setInputValue(input, config.incomeVerifiedDate, 'Income Verified Date');
+      }
+    }
+  }
+
+  // Select "PRISM code" for Income Verification Type (always)
+  await sleep(300);
+  const result = await selectDropdown('Income Verification Type', 'PRISM code');
+  if (result) {
+    log('  ✓ Selected PRISM code for Income Verification Type');
+    await sleep(500);
+
+    // Get last 4 digits of zip code from customer info (stored in config.zipCode)
+    const zipCode = config.zipCode || '';
+    const last4Zip = zipCode.slice(-4);
+
+    if (last4Zip) {
+      // Find and fill "Enter Plus 4" field with last 4 zip digits
+      const plus4Label = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Plus 4') || l.textContent.includes('Enter Plus'));
+      if (plus4Label) {
+        const formField = plus4Label.closest('mat-form-field');
+        if (formField) {
+          const input = formField.querySelector('input');
+          if (input) {
+            await setInputValue(input, last4Zip, 'Enter Plus 4');
+            log(`  ✓ Filled Plus 4 with last 4 of zip: ${last4Zip}`);
+          }
+        }
+      }
+
+      // Click the sync save button (mat-icon="backup")
+      await sleep(300);
+      const syncSaveBtn = document.querySelector('button mat-icon[fonticon="backup"], mat-icon[fonticon="backup"], button:has(mat-icon[fonticon="backup"])');
+      if (syncSaveBtn) {
+        const btn = syncSaveBtn.tagName === 'BUTTON' ? syncSaveBtn : syncSaveBtn.closest('button');
+        if (btn) {
+          btn.click();
+          log('  ✓ Clicked sync save button');
+          await sleep(800);
+        }
+      }
+    }
+  }
+
+  log('✅ Enrollment Information filled!');
+}
+
+// ============================================
+// SUMMARY INFO (Project Information/Summary)
+// ============================================
+async function fillSummaryInfo() {
+  log('📋 Filling Summary Info (Project Information)...');
+  await sleep(1500);
+
+  // Wait for Angular stability
+  await waitForAngularStability(2000);
+
+  // Fill the appointment date (from config.attempt1Date)
+  if (config.attempt1Date) {
+    // Look for date field with calendar icon
+    const dateLabels = Array.from(document.querySelectorAll('mat-label'));
+    const dateLabel = dateLabels.find(l => l.textContent.includes('Date') && !l.textContent.includes('Income'));
+
+    if (dateLabel) {
+      const formField = dateLabel.closest('mat-form-field');
+      if (formField) {
+        // Try clicking the date picker toggle
+        const dateToggle = formField.querySelector('mat-datepicker-toggle button, button[aria-label*="Open calendar" i], button[aria-label*="calendar" i]');
+        if (dateToggle) {
+          dateToggle.click();
+          log('  ✓ Opened date picker');
+          await sleep(500);
+
+          // Try to find and click the specific date from config
+          // Parse the attempt1Date (format: MM/DD/YYYY or similar)
+          const dateParts = config.attempt1Date.split('/');
+          const targetDay = parseInt(dateParts[1] || '01', 10);
+
+          // Look for calendar with days
+          const calendarDays = Array.from(document.querySelectorAll('mat-calendar-body td:not(.mat-calendar-body-disabled) div'));
+          if (calendarDays.length > 0) {
+            // Try to find the day matching our date
+            const targetDayEl = calendarDays.find(el => {
+              const dayText = el.textContent.trim();
+              return parseInt(dayText, 10) === targetDay;
+            });
+
+            if (targetDayEl) {
+              targetDayEl.click();
+              log(`  ✓ Selected date: ${config.attempt1Date}`);
+            } else {
+              // Click the first available day as fallback
+              calendarDays[0].click();
+              log(`  ✓ Selected first available day`);
+            }
+          } else {
+            // Fallback: type the date directly
+            const input = formField.querySelector('input');
+            if (input) {
+              await setInputValue(input, config.attempt1Date, 'Date');
+            }
+          }
+          await sleep(400);
+        } else {
+          // No date picker, try direct input
+          const input = formField.querySelector('input');
+          if (input) {
+            await setInputValue(input, config.attempt1Date, 'Date');
+          }
+        }
+      }
+    }
+  }
+
+  // Fill Electronic Acceptance Terms (from config)
+  await sleep(300);
+  if (config.electronicAcceptance) {
+    await selectDropdown('Electronic Acceptance Terms', config.electronicAcceptance);
+  }
+
+  // Fill "Did you receive incentive..." (from config)
+  await sleep(300);
+  if (config.priorIncentive) {
+    await selectDropdown('Did you receive', config.priorIncentive);
+  }
+
+  log('✅ Summary Info filled!');
+}
+
+// ============================================
 // APPLICATION STATUS - ACCEPT LEAD
 // ============================================
 async function acceptLead() {
-  log('📋 Accepting Lead...');
+  log('📋 Application Status...');
+
+  // Check if auto-accept is enabled
+  if (config.autoAcceptLead !== 'true' && config.autoAcceptLead !== true) {
+    log('  ⊙ Auto-accept disabled, skipping status change');
+    return;
+  }
+
   await sleep(1500);
 
-  // Find and click the status dropdown (Lead Assigned -> Accepted)
+  // Use the finalStatus from config
+  const targetStatus = config.finalStatus || 'Accepted';
+  log(`  → Setting status to: ${targetStatus}`);
+
+  // Find and click the status dropdown
   const statusDropdown = document.querySelector('mat-select[role="listbox"]');
   if (statusDropdown) {
     statusDropdown.click();
     await sleep(500);
 
-    // Find and click "Accepted" option
+    // Find and click the target status option
     const options = Array.from(document.querySelectorAll('mat-option'));
-    const acceptedOption = options.find(o => o.textContent && o.textContent.includes('Accepted'));
+    const targetOption = options.find(o => o.textContent && o.textContent.includes(targetStatus));
 
-    if (acceptedOption) {
-      acceptedOption.click();
-      log('  ✓ Changed status to: Accepted');
+    if (targetOption) {
+      targetOption.click();
+      log(`  ✓ Changed status to: ${targetStatus}`);
     } else {
-      log('  ⚠️ Accepted option not found');
+      log(`  ⚠️ "${targetStatus}" option not found, trying "Accepted"`);
+      const acceptedOption = options.find(o => o.textContent && o.textContent.includes('Accepted'));
+      if (acceptedOption) {
+        acceptedOption.click();
+        log('  ✓ Changed status to: Accepted');
+      } else {
+        log('  ⚠️ Accepted option not found');
+      }
     }
   } else {
     log('  ⚠️ Status dropdown not found');
   }
 
-  log('✅ Lead accepted!');
+  log('✅ Application Status updated!');
 }
 
-async function clickNext(expectedPage) {
-  log(`➡️ Next → ${expectedPage}`);
+async function clickNext(expectedPageKey) {
+  log(`➡️ Next → ${expectedPageKey}`);
 
-  const allButtons = Array.from(document.querySelectorAll('button, mat-button'));
-  const nextBtn = allButtons.find(b => {
-    const text = b.textContent.trim();
-    return text.includes('>') || text.toLowerCase().includes('next');
-  });
+  // Certain pages are NOT in the sidebar and must be reached via Next button
+  const nonSidebarPages = ['measure-info', 'summary-info', 'application-status'];
 
-  if (!nextBtn) {
-    log('⚠️ Next button not found, trying sidebar navigation');
-    const sectionTitle = keyToSectionTitle(expectedPage) || expectedPage;
-    if (sectionTitle && goToSectionTitle(sectionTitle)) {
-      return waitForPage(expectedPage, 8000);
+  const sectionTitle = keyToSectionTitle(expectedPageKey) || expectedPageKey;
+  const availableSections = getAvailableSectionTitles();
+  log(`  📋 Available sections: ${availableSections.join(', ')}`);
+
+  // PRIORITY 1: For non-sidebar pages, use Next button immediately
+  if (nonSidebarPages.includes(expectedPageKey)) {
+    const nextBtn = findNextButton();
+    if (nextBtn) {
+      nextBtn.click();
+      log(`  ✓ Clicked Next button for non-sidebar page`);
+      return waitForPage(expectedPageKey, 8000);
+    } else {
+      log(`  ⚠️ Next button not found for ${expectedPageKey}`);
     }
-    log(`  ❌ Navigation failed: could not find Next button or sidebar section "${expectedPage}"`);
-    return false;
   }
 
-  nextBtn.click();
+  // PRIORITY 2: Try to find and click the section in sidebar
+  if (sectionTitle && goToSectionTitle(sectionTitle)) {
+    log(`  ✓ Clicked sidebar: ${sectionTitle}`);
+    return waitForPage(expectedPageKey, 8000);
+  }
 
-  return waitForPage(expectedPage, 8000);
+  // FALLBACK: If expected section not found, try clicking the next incomplete section in sidebar
+  const nextSectionTitle = getNextSectionTitle();
+  if (nextSectionTitle) {
+    log(`  📋 Expected section "${sectionTitle}" not found, trying next available: "${nextSectionTitle}"`);
+    if (goToSectionTitle(nextSectionTitle)) {
+      log(`  ✓ Clicked sidebar: ${nextSectionTitle}`);
+      // Map the section title back to a key for waiting
+      const nextKey = globalThis.SCEAutoFillUtils?.sectionTitleToKey
+        ? globalThis.SCEAutoFillUtils.sectionTitleToKey(nextSectionTitle)
+        : expectedPageKey;
+      return waitForPage(nextKey, 8000);
+    }
+  }
+
+  // PRIORITY 3: Try clicking the "Next" button (form submit)
+  const nextBtn = findNextButton();
+  if (nextBtn) {
+    nextBtn.click();
+    log(`  ✓ Clicked Next button`);
+    return waitForPage(expectedPageKey, 8000);
+  }
+
+  log(`  ❌ Navigation failed: could not find "${sectionTitle}" in sidebar or Next button`);
+  return false;
+}
+
+function findNextButton() {
+  // Pattern 1: Submit button with > text
+  let btn = document.querySelector('button[type="submit"]');
+  if (btn) return btn;
+
+  // Pattern 2: Button with > in text content
+  btn = Array.from(document.querySelectorAll('button, mat-button')).find(b => {
+    const text = b.textContent.trim();
+    return text === '>' || text.includes('>') || text.toLowerCase().includes('next');
+  });
+  if (btn) return btn;
+
+  // Pattern 3: Button with mat-icon containing arrow
+  const icon = Array.from(document.querySelectorAll('button mat-icon, button i.material-icons, button i.fa')).find(icon => {
+    const iconText = icon.textContent.trim();
+    return iconText === 'arrow_forward' || iconText === 'chevron_right' || iconText === '>';
+  });
+  if (icon) return icon.closest('button');
+
+  return null;
 }
 
 async function waitForPage(expectedPage, timeoutMs = 15000) {
@@ -1250,118 +1841,140 @@ async function waitForPage(expectedPage, timeoutMs = 15000) {
 // ============================================
 async function runFillForm() {
   log('🚀 Starting SCE Form Auto-Fill...');
+  log('   📋 This will fill ALL sections in the sidebar...');
 
   // Ensure config is loaded before proceeding
   await loadConfig();
 
+  // Complete workflow: go through ALL sections in order
+  // Section order in sidebar (may vary by program):
+  const workflow = [
+    { key: 'customer-search', name: 'Customer Search', action: fillCustomerSearch },
+    { key: 'customer-information', name: 'Customer Information', action: fillCustomerInfo },
+    { key: 'additional-customer-info', name: 'Additional Customer Information', action: fillAdditionalCustomerInfo },
+    { key: 'enrollment-information', name: 'Enrollment Information', action: fillEnrollmentInformation },
+    { key: 'project-information', name: 'Project Information', action: fillProjectInformation },
+    { key: 'trade-ally-information', name: 'Trade Ally Information', action: fillTradeAllyInformation },
+    { key: 'appointment-contact', name: 'Appointment Contact', action: fillAppointmentContact },
+    { key: 'appointments', name: 'Appointments', action: fillCustomFieldsOnly },
+    { key: 'assessment-questionnaire', name: 'Assessment Questionnaire', action: fillAssessmentQuestionnaire },
+    { key: 'equipment-information', name: 'Equipment Information', action: fillCustomFieldsOnly },
+    { key: 'basic-enrollment-equipment', name: 'Basic Enrollment Equipment', action: fillCustomFieldsOnly },
+    { key: 'bonus-adjustment-measures', name: 'Bonus/Adjustment Measures', action: fillCustomFieldsOnly },
+    { key: 'review-terms', name: 'Review Terms and Conditions', action: fillCustomFieldsOnly },
+    { key: 'file-uploads', name: 'File Uploads', action: fillCustomFieldsOnly },
+    { key: 'review-comments', name: 'Review Comments', action: fillCustomFieldsOnly },
+    { key: 'measure-info', name: 'Measure Info', action: fillMeasureInfoPhase },
+    { key: 'summary-info', name: 'Summary Info', action: fillSummaryInfo },
+    { key: 'application-status', name: 'Application Status', action: acceptLead }
+  ];
+
+  // Find where to start in the workflow based on current page
   const currentPage = detectCurrentPage();
   log(`   Current page: ${currentPage}`);
 
-  switch (currentPage) {
-    case 'application-status':
-      await acceptLead();
-      break;
-
-    case 'measure-info':
-      // On measure-info page, create appointment
-      await createAppointment();
-      break;
-
-    case 'appointment-contact':
-      await fillAppointmentContact();
-      await fillCustomFieldsForSection('Appointment Contact');
-      await clickNext('assessment-questionnaire');
-      await fillAssessmentQuestionnaire();
-      await clickNext('measure-info');
-      break;
-
-    case 'assessment-questionnaire':
-      await fillAssessmentQuestionnaire();
-      await fillCustomFieldsForSection('Assessment Questionnaire');
-      await clickNext('measure-info');
-      break;
-
-    case 'customer-search':
-      await fillCustomerSearch(config.address, config.zipCode);
-      // Wait for Customer Information page
-      await waitForPage('customer-information', 15000);
-      await fillCustomerInfo();
-      await fillCustomFieldsForSection('Customer Information');
-      await clickNext('additional-customer-info');
-      await fillAdditionalCustomerInfo();
-      await fillCustomFieldsForSection('Additional Customer Information');
-      await clickNext('enrollment-information');
-      await clickNext('project-information');
-      await fillProjectInformation();
-      await fillCustomFieldsForSection('Project Information');
-      await clickNext('trade-ally-information');
-      await fillTradeAllyInformation();
-      await fillCustomFieldsForSection('Trade Ally Information');
-      break;
-
-    case 'customer-information':
-      await fillCustomerInfo();
-      await fillCustomFieldsForSection('Customer Information');
-      await clickNext('additional-customer-info');
-      await fillAdditionalCustomerInfo();
-      await clickNext('enrollment-information');
-      await clickNext('project-information');
-      await fillProjectInformation();
-      await clickNext('trade-ally-information');
-      await fillTradeAllyInformation();
-      break;
-
-    case 'additional-customer-info':
-      await fillAdditionalCustomerInfo();
-      await fillCustomFieldsForSection('Additional Customer Information');
-      await clickNext('enrollment-information');
-      await clickNext('project-information');
-      await fillProjectInformation();
-      await clickNext('trade-ally-information');
-      await fillTradeAllyInformation();
-      break;
-
-    case 'enrollment-information':
-      await fillCustomFieldsForSection('Enrollment Information');
-      await clickNext('project-information');
-      await fillProjectInformation();
-      await clickNext('trade-ally-information');
-      await fillTradeAllyInformation();
-      break;
-
-    case 'household-members':
-      await fillHouseholdMembers();
-      await clickNext('project-information');
-      break;
-
-    case 'project-information':
-      await fillProjectInformation();
-      await fillCustomFieldsForSection('Project Information');
-      await clickNext('trade-ally-information');
-      await fillTradeAllyInformation();
-      break;
-
-    case 'trade-ally-information':
-      await fillTradeAllyInformation();
-      await fillCustomFieldsForSection('Trade Ally Information');
-      break;
-
-    case 'equipment-information':
-    case 'basic-enrollment-equipment':
-    case 'bonus-adjustment-measures':
-    case 'review-terms':
-    case 'file-uploads':
-    case 'review-comments': {
-      const sectionTitle = keyToSectionTitle(currentPage) || getActiveSectionTitle() || currentPage;
-      await fillCustomFieldsForSection(sectionTitle);
+  let startIndex = 0;
+  for (let i = 0; i < workflow.length; i++) {
+    if (workflow[i].key === currentPage) {
+      startIndex = i;
       break;
     }
-
-    default:
-      log('⚠️ Page not recognized for auto-fill');
   }
 
-  log('✅ Auto-Fill complete!');
+  log(`   ▶️ Starting from: ${workflow[startIndex].name}`);
+
+  // Execute workflow from start index
+  for (let i = startIndex; i < workflow.length; i++) {
+    const step = workflow[i];
+    log(`\n📌 [${i + 1}/${workflow.length}] ${step.name}`);
+
+    // Navigate to this section if not already there
+    const activePage = detectCurrentPage();
+    if (activePage !== step.key) {
+      const sectionTitle = keyToSectionTitle(step.key);
+      if (sectionTitle && goToSectionTitle(sectionTitle)) {
+        log(`  ✓ Navigated to: ${sectionTitle}`);
+        await sleep(1000);
+      } else if (step.key === 'customer-search') {
+        log(`  ✓ Starting fresh from Customer Search`);
+      } else if (step.key === 'measure-info' || step.key === 'summary-info' || step.key === 'application-status') {
+        // These are non-sidebar pages, use Next button to reach them
+        const nextBtn = findNextButton();
+        if (nextBtn) {
+          nextBtn.click();
+          log(`  ✓ Clicked Next button to reach ${step.name}`);
+          await waitForPage(step.key, 8000);
+        }
+      }
+    }
+
+    // Wait for page stability
+    await waitForAngularStability(3000);
+
+    // Execute the action for this step
+    try {
+      if (step.action === fillCustomFieldsOnly) {
+        const sectionTitle = keyToSectionTitle(step.key) || step.name;
+        await fillCustomFieldsForSection(sectionTitle);
+      } else if (step.action === fillMeasureInfoPhase) {
+        // Measure Info: fill household members and create appointment
+        await fillHouseholdMembers();
+        await createAppointment();
+      } else {
+        await step.action();
+      }
+    } catch (err) {
+      log(`  ⚠️ Error in ${step.name}: ${err.message}`);
+    }
+
+    // Fill custom fields for this section
+    const sectionTitle = keyToSectionTitle(step.key) || step.name;
+    if (step.action !== fillCustomFieldsOnly) {
+      await fillCustomFieldsForSection(sectionTitle);
+    }
+
+    // Don't navigate after the last step
+    if (i < workflow.length - 1) {
+      const nextStep = workflow[i + 1];
+      log(`   ➡️ Moving to: ${nextStep.name}`);
+
+      // Try to navigate to next section
+      const nextSectionTitle = keyToSectionTitle(nextStep.key);
+      if (nextSectionTitle && goToSectionTitle(nextSectionTitle)) {
+        log(`  ✓ Clicked sidebar: ${nextSectionTitle}`);
+        await sleep(1000);
+      } else {
+        // Use Next button for non-sidebar pages
+        const nextBtn = findNextButton();
+        if (nextBtn) {
+          nextBtn.click();
+          log(`  ✓ Clicked Next button`);
+          await sleep(1500);
+        } else {
+          log(`  ⚠️ No navigation method found for ${nextStep.name}`);
+        }
+      }
+    }
+  }
+
+  log('\n✅ Auto-Fill complete! All sections processed.');
+}
+
+// Helper for sections that only need custom field filling
+async function fillCustomFieldsOnly() {
+  // This is handled in the main workflow
+}
+
+// Helper for Measure Info phase (Household Members + Appointment)
+async function fillMeasureInfoPhase() {
+  log('📋 Filling Measure Info (Household Members + Appointment)...');
+  await sleep(1500);
+  await waitForAngularStability(2000);
+
+  await fillHouseholdMembers();
+  await createAppointment();
+
+  log('✅ Measure Info filled!');
 }
 
 // ============================================
@@ -1407,7 +2020,7 @@ function initOnPageLoad() {
   // Show banner on form pages
   if (['customer-search', 'customer-information', 'additional-customer-info', 'enrollment-information',
        'project-information', 'trade-ally-information', 'appointment-contact', 'assessment-questionnaire',
-       'measure-info', 'application-status'].includes(page)) {
+       'measure-info', 'summary-info', 'application-status'].includes(page)) {
     if (config.autoFillPrompt) {
       setTimeout(showBanner, 1500);
     }
