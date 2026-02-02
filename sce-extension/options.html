@@ -176,24 +176,24 @@
 
   <!-- Tabs - matching sidebar sections -->
   <div class="tabs">
-    <button class="tab active" onclick="switchTab('customer-search')">Search</button>
-    <button class="tab" onclick="switchTab('customer-info')">Customer Info</button>
-    <button class="tab" onclick="switchTab('additional-info')">Additional</button>
-    <button class="tab" onclick="switchTab('enrollment')">Enrollment</button>
-    <button class="tab" onclick="switchTab('household')">Household</button>
-    <button class="tab" onclick="switchTab('project')">Project</button>
-    <button class="tab" onclick="switchTab('trade-ally')">Trade Ally</button>
-    <button class="tab" onclick="switchTab('appointment')">Appt Contact</button>
-    <button class="tab" onclick="switchTab('appointments')">Appointments</button>
-    <button class="tab" onclick="switchTab('assessment')">Assessment</button>
-    <button class="tab" onclick="switchTab('equipment')">Equipment</button>
-    <button class="tab" onclick="switchTab('basic-enrollment')">Basic Enroll</button>
-    <button class="tab" onclick="switchTab('bonus')">Bonus</button>
-    <button class="tab" onclick="switchTab('terms')">Terms</button>
-    <button class="tab" onclick="switchTab('uploads')">Uploads</button>
-    <button class="tab" onclick="switchTab('comments')">Comments</button>
-    <button class="tab" onclick="switchTab('status')">Status</button>
-    <button class="tab" onclick="switchTab('behavior')">Behavior</button>
+    <button class="tab active" data-tab="customer-search">Search</button>
+    <button class="tab" data-tab="customer-info">Customer Info</button>
+    <button class="tab" data-tab="additional-info">Additional</button>
+    <button class="tab" data-tab="enrollment">Enrollment</button>
+    <button class="tab" data-tab="household">Household</button>
+    <button class="tab" data-tab="project">Project</button>
+    <button class="tab" data-tab="trade-ally">Trade Ally</button>
+    <button class="tab" data-tab="appointment">Appt Contact</button>
+    <button class="tab" data-tab="appointments">Appointments</button>
+    <button class="tab" data-tab="assessment">Assessment</button>
+    <button class="tab" data-tab="equipment">Equipment</button>
+    <button class="tab" data-tab="basic-enrollment">Basic Enroll</button>
+    <button class="tab" data-tab="bonus">Bonus</button>
+    <button class="tab" data-tab="terms">Terms</button>
+    <button class="tab" data-tab="uploads">Uploads</button>
+    <button class="tab" data-tab="comments">Comments</button>
+    <button class="tab" data-tab="status">Status</button>
+    <button class="tab" data-tab="behavior">Behavior</button>
   </div>
 
   <!-- Tab: Customer Search -->
@@ -227,7 +227,7 @@
 
       <div class="field">
         <label>Contact Last Name (for auto-fill)</label>
-        <input type="text" id="lastName" value="Corp">
+        <input type="text" id="lastName" value="Correa">
       </div>
 
       <div class="field">
@@ -236,9 +236,8 @@
       </div>
 
       <div class="field">
-        <label>Contact Email (leave empty to use generated email)</label>
-        <input type="text" id="email" value="">
-        <div class="helper">Leave empty to auto-generate from customer name</div>
+        <label>Contact Email</label>
+        <input type="text" id="email" value="scm.energysavings@gmail.com">
       </div>
     </div>
   </div>
@@ -490,7 +489,7 @@
         </div>
         <div class="field">
           <label>Project Contact Last Name</label>
-          <input type="text" id="projectLastName" value="Corp">
+          <input type="text" id="projectLastName" value="Correa">
         </div>
       </div>
 
@@ -571,7 +570,7 @@
 
       <div class="field">
         <label>Contractor Name</label>
-        <input type="text" id="contractorName" value="Sergio Corp">
+        <input type="text" id="contractorName" value="Sergio Correa">
         <div class="helper">Type first few letters to search in dropdown</div>
       </div>
 
@@ -713,12 +712,12 @@
           <div class="field">
             <label>What is the fuel type of the water heater?</label>
             <select id="waterHeaterFuel">
-              <option value="Natural Gas">Natural Gas</option>
+              <option value="Natural Gas" selected>Natural Gas</option>
               <option value="Electric">Electric</option>
               <option value="Propane">Propane</option>
               <option value="Solar">Solar</option>
               <option value="Heat Pump">Heat Pump</option>
-              <option value="Other" selected>Other</option>
+              <option value="Other">Other</option>
             </select>
           </div>
           <div class="field">
@@ -894,8 +893,8 @@
       <div class="field">
         <label>Auto-upload Documents (if available)</label>
         <select id="autoUploadDocs">
-          <option value="true" selected>Yes - Auto-upload from config</option>
-          <option value="false">No - Skip uploads</option>
+          <option value="false" selected>No - Skip uploads</option>
+          <option value="true">Yes - Auto-upload from config</option>
         </select>
         <div class="helper">Documents will need to be manually uploaded in most cases</div>
       </div>

@@ -20,12 +20,21 @@ function switchTab(tabName) {
     selectedContent.classList.add('active');
   }
 
-  // Activate corresponding tab button
-  const tabs = document.querySelectorAll('.tab');
-  tabs.forEach((tab) => {
-    if (tab.getAttribute('onclick').includes(tabName)) {
-      tab.classList.add('active');
-    }
+  // Activate corresponding tab button (using data-tab attribute)
+  const activeTab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+  if (activeTab) {
+    activeTab.classList.add('active');
+  }
+}
+
+// Set up tab event listeners
+function setupTabListeners() {
+  const tabs = document.querySelectorAll('.tab[data-tab]');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.getAttribute('data-tab');
+      switchTab(tabName);
+    });
   });
 }
 
@@ -36,9 +45,9 @@ const defaultConfig = {
 
   // Customer Information
   firstName: 'Sergio',
-  lastName: 'Corp',
+  lastName: 'Correa',
   phone: '7143912727',
-  email: '',
+  email: 'scm.energysavings@gmail.com',
 
   // Additional Customer Information
   preferredContactTime: '1:00PM - 3:30PM',
@@ -76,10 +85,10 @@ const defaultConfig = {
 
   // Trade Ally Information
   projectFirstName: 'Sergio',
-  projectLastName: 'Corp',
+  projectLastName: 'Correa',
   projectTitle: 'Outreach',
   projectPhone: '7143912727',
-  projectEmail: '',
+  projectEmail: 'scm.energysavings@gmail.com',
 
   // Appointment Contact
   attempt1Date: '01/30/2026',
@@ -88,7 +97,7 @@ const defaultConfig = {
   attempt2Time: '3:00PM',
 
   // Appointments
-  contractorName: 'Sergio Corp',
+  contractorName: 'Sergio Correa',
   appointmentDate: '01/30/2026',
   appointmentStatus: 'Scheduled',
   appointmentType: 'On-Site Appointment',
@@ -102,7 +111,7 @@ const defaultConfig = {
   refrigeratorCount: '1',
   fridge1Year: '2022',
   hasFreezer: 'No',
-  waterHeaterFuel: 'Other',
+  waterHeaterFuel: 'Natural Gas',
   waterHeaterSize: '40 Gal',
   hasDishwasher: 'No',
   hasClothesWasher: 'No',
@@ -127,7 +136,7 @@ const defaultConfig = {
   priorIncentive: 'No',
 
   // Uploads
-  autoUploadDocs: 'true',
+  autoUploadDocs: 'false',
 
   // Comments
   reviewComment: '',
@@ -214,7 +223,7 @@ function loadConfig() {
 
     // Trade Ally Information
     setValue('projectFirstName', config.projectFirstName, 'Sergio');
-    setValue('projectLastName', config.projectLastName, 'Corp');
+    setValue('projectLastName', config.projectLastName, 'Correa');
     setValue('projectTitle', config.projectTitle, 'Outreach');
     setValue('projectPhone', config.projectPhone, '7143912727');
     setValue('projectEmail', config.projectEmail);
@@ -226,7 +235,7 @@ function loadConfig() {
     setValue('attempt2Time', config.attempt2Time, '3:00PM');
 
     // Appointments
-    setValue('contractorName', config.contractorName, 'Sergio Corp');
+    setValue('contractorName', config.contractorName, 'Sergio Correa');
     setValue('appointmentDate', config.appointmentDate);
     setValue('appointmentStatus', config.appointmentStatus, 'Scheduled');
     setValue('appointmentType', config.appointmentType, 'On-Site Appointment');
@@ -240,7 +249,7 @@ function loadConfig() {
     setValue('refrigeratorCount', config.refrigeratorCount, '1');
     setValue('fridge1Year', config.fridge1Year);
     setValue('hasFreezer', config.hasFreezer, 'No');
-    setValue('waterHeaterFuel', config.waterHeaterFuel, 'Other');
+    setValue('waterHeaterFuel', config.waterHeaterFuel, 'Natural Gas');
     setValue('waterHeaterSize', config.waterHeaterSize, '40 Gal');
     setValue('hasDishwasher', config.hasDishwasher, 'No');
     setValue('hasClothesWasher', config.hasClothesWasher, 'No');
@@ -265,7 +274,7 @@ function loadConfig() {
     setValue('priorIncentive', config.priorIncentive, 'No');
 
     // Uploads
-    setValue('autoUploadDocs', config.autoUploadDocs, 'true');
+    setValue('autoUploadDocs', config.autoUploadDocs, 'false');
 
     // Comments
     setValue('reviewComment', config.reviewComment);
@@ -345,7 +354,7 @@ function saveConfig() {
 
     // Trade Ally Information
     projectFirstName: getValue('projectFirstName', 'Sergio'),
-    projectLastName: getValue('projectLastName', 'Corp'),
+    projectLastName: getValue('projectLastName', 'Correa'),
     projectTitle: getValue('projectTitle', 'Outreach'),
     projectPhone: getValue('projectPhone', '7143912727'),
     projectEmail: getValue('projectEmail'),
@@ -357,7 +366,7 @@ function saveConfig() {
     attempt2Time: getValue('attempt2Time', '3:00PM'),
 
     // Appointments
-    contractorName: getValue('contractorName', 'Sergio Corp'),
+    contractorName: getValue('contractorName', 'Sergio Correa'),
     appointmentDate: getValue('appointmentDate'),
     appointmentStatus: getValue('appointmentStatus', 'Scheduled'),
     appointmentType: getValue('appointmentType', 'On-Site Appointment'),
@@ -371,7 +380,7 @@ function saveConfig() {
     refrigeratorCount: getValue('refrigeratorCount', '1'),
     fridge1Year: getValue('fridge1Year'),
     hasFreezer: getValue('hasFreezer', 'No'),
-    waterHeaterFuel: getValue('waterHeaterFuel', 'Other'),
+    waterHeaterFuel: getValue('waterHeaterFuel', 'Natural Gas'),
     waterHeaterSize: getValue('waterHeaterSize', '40 Gal'),
     hasDishwasher: getValue('hasDishwasher', 'No'),
     hasClothesWasher: getValue('hasClothesWasher', 'No'),
@@ -396,7 +405,7 @@ function saveConfig() {
     priorIncentive: getValue('priorIncentive', 'No'),
 
     // Uploads
-    autoUploadDocs: getValue('autoUploadDocs', 'true'),
+    autoUploadDocs: getValue('autoUploadDocs', 'false'),
 
     // Comments
     reviewComment: getValue('reviewComment'),
@@ -436,8 +445,9 @@ function resetToDefaults() {
 }
 
 // Event listeners
-document.getElementById('saveBtn').addEventListener('click', saveConfig);
-document.getElementById('resetBtn').addEventListener('click', resetToDefaults);
-
-// Load on page ready
-loadConfig();
+document.addEventListener('DOMContentLoaded', () => {
+  setupTabListeners();
+  document.getElementById('saveBtn').addEventListener('click', saveConfig);
+  document.getElementById('resetBtn').addEventListener('click', resetToDefaults);
+  loadConfig();
+});
