@@ -2338,11 +2338,86 @@ function updateBannerButtonError(banner, _message) {
 }
 
 // ============================================
+// SIDEBAR SECTION OBSERVER
+// ============================================
+
+// Global observer reference so we can disconnect if needed
+let sidebarObserver = null;
+let sidebarObserverRetryTimer = null;
+let lastActiveSection = null; // Cache to avoid unnecessary updates
+
+// Update the banner's section button text based on current active section
+function handleSidebarChange() {
+  const currentSection = getActiveSectionTitle();
+
+  // Only update if the active section actually changed
+  if (currentSection === lastActiveSection) return;
+  lastActiveSection = currentSection;
+
+  const banner = document.getElementById('sce-autofill-banner');
+  if (banner) {
+    updateSectionButton(banner);
+  }
+}
+
+// Set up MutationObserver to watch for sidebar section changes
+function setupSidebarObserver() {
+  // If already set up, don't create another
+  if (sidebarObserver) {
+    return;
+  }
+
+  const sidebar = document.querySelector('.sections-menu');
+
+  if (!sidebar) {
+    // Sidebar not ready - retry after delay (handles async Angular rendering)
+    if (!sidebarObserverRetryTimer) {
+      sidebarObserverRetryTimer = setTimeout(() => {
+        sidebarObserverRetryTimer = null;
+        setupSidebarObserver();
+      }, 500);
+    }
+    return;
+  }
+
+  // Set up MutationObserver to watch for class changes on sidebar items
+  sidebarObserver = new MutationObserver((mutations) => {
+    try {
+      // Check if any mutation is relevant (sidebar item class change)
+      const hasRelevantChange = mutations.some(mutation =>
+        mutation.type === 'attributes' &&
+        mutation.attributeName === 'class' &&
+        mutation.target.classList?.contains('sections-menu-item')
+      );
+
+      if (hasRelevantChange) {
+        handleSidebarChange();
+      }
+    } catch (err) {
+      log('  ⚠️ Sidebar observer error: ' + err.message);
+    }
+  });
+
+  // Observe the sidebar for attribute changes on its descendants
+  sidebarObserver.observe(sidebar, {
+    attributes: true,
+    subtree: true,
+    attributeFilter: ['class']
+  });
+
+  log('  👀 Sidebar observer active - watching for section changes');
+}
+
+// ============================================
 // PAGE LOAD DETECTION
 // ============================================
 function initOnPageLoad() {
   const page = detectCurrentPage();
   log(`Page detected: ${page}`);
+
+  // Set up sidebar observer on all SCE pages
+  // This ensures the section button updates when user clicks sidebar
+  setupSidebarObserver();
 
   // Show banner on form pages
   if (['customer-search', 'customer-information', 'additional-customer-info', 'enrollment-information',
