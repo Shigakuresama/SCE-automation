@@ -1,14 +1,20 @@
 /**
  * SCE Proxy Server
- * Local server for scraping property data from Zillow/Redfin
+ * Local server for scraping property data via Google Search
+ * Aggregates data from Zillow, Redfin, County Records
  * Runs on localhost:3000
  */
 
-const express = require('express');
-const cors = require('cors');
-const { chromium } = require('playwright');
-const fs = require('fs').promises;
-const path = require('path');
+import express from 'express';
+import cors from 'cors';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { scrapeProperty } from './scrapers/index.js';
+import { retryWithBackoff, NetworkError } from '@sce/error-handling/dist/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3000;
@@ -65,121 +71,88 @@ function cleanExpiredCache() {
 }
 
 // ============================================
-// ZILLOW SCRAPER
+// LEGACY DUCKDUCKGO SCRAPER
+// NOTE: Replaced by unified scraper with fallback chain (see scrapers/index.js)
+// Kept for reference only
 // ============================================
-async function scrapeZillow(address, zipCode) {
-  console.log(`[Zillow] Searching: ${address}, ${zipCode}`);
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
-  let result = null;
+/*
+async function scrapeDuckDuckGo(address, zipCode) {
+  console.log(`[DuckDuckGo] Searching: ${address}, ${zipCode}`);
+  // Note: headless: false required because DuckDuckGo detects headless browsers
+  const browser = await chromium.launch({
+    headless: false,
+    args: ['--disable-blink-features=AutomationControlled']
+  });
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  });
+  const page = await context.newPage();
+  let result = { sqFt: null, yearBuilt: null };
 
   try {
-    // Set realistic user agent
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-
-    // Go to Zillow search
-    const searchUrl = `https://www.zillow.com/${zipCode}/?searchQueryState={"pagination":{},"usersSearchTerm":"${address} ${zipCode}","mapBounds":{}}`;
-    await page.goto(searchUrl, { timeout: 15000, waitUntil: 'domcontentloaded' });
-
-    // Wait for results
+    // Use DuckDuckGo HTML version (no JS required, no CAPTCHA)
+    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(address + ' ' + zipCode)}`;
+    await page.goto(searchUrl, { timeout: 20000, waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2000);
 
-    // Try to find property card with address
-    const propertyCard = await page.$('div[data-address*="' + address.toLowerCase() + '" i], address-component a');
-    if (propertyCard) {
-      await propertyCard.click();
-      await page.waitForTimeout(1500);
-    }
-
-    // Extract property data from the page
+    // Extract property data from search results
     result = await page.evaluate(() => {
-      // Helper to find text by selector patterns
-      function findValue(selectors) {
-        for (const sel of selectors) {
-          const el = document.querySelector(sel);
-          if (el) {
-            let text = el.textContent || el.value || '';
-            // Extract numbers
-            const match = text.match(/[\d,]+/);
-            return match ? match[0].replace(/,/g, '') : null;
-          }
+      const pageText = document.body.innerText;
+      const data = { sqFt: null, yearBuilt: null };
+
+      // Extract Square Footage - look for patterns in Redfin/Zillow snippets
+      // Examples from actual results:
+      // "1,249 square foot house"
+      // "1,249 Square Feet single family home"
+      const sqFtPatterns = [
+        /(\d{1,4}[,\d]*)\s*(?:square foot|sq\.? ft\.?|sqft|Square Feet)/i,
+        /(\d{1,4}[,\d]*)\s*(?:square feet|sq feet)/i,
+        /(?:is a|was a|home is)\s+(\d{1,4}[,\d]*)\s*(?:square foot)/i,
+      ];
+
+      for (const pattern of sqFtPatterns) {
+        const match = pageText.match(pattern);
+        if (match) {
+          data.sqFt = match[1].replace(/,/g, '');
+          break;
         }
-        return null;
       }
 
-      // Try multiple selector patterns for SqFt
-      const sqFt = findValue([
-        'span:has-text("sqft")',
-        'dt:has-text("sqft") + dd',
-        '[data-testid="home-details-row"]',
-        '.ds-home-fact-label:has-text("sqft") + .ds-home-fact-value'
-      ]);
+      // Extract Year Built - Zillow often includes "built in 1954"
+      const yearPatterns = [
+        /(?:built in|constructed in|year built)[:\s]+(\d{4})/i,
+        /(?:single family home built in)\s+(\d{4})/i,
+        /(?:home was built in)\s+(\d{4})/i,
+        /(?:was built)\s+(\d{4})/i,
+      ];
 
-      // Try multiple patterns for Year Built
-      const yearBuilt = findValue([
-        'dt:has-text("Year Built") + dd',
-        '[data-testid="home-details-row"]',
-        '.ds-home-fact-label:has-text("Year Built") + .ds-home-fact-value'
-      ]);
+      for (const pattern of yearPatterns) {
+        const match = pageText.match(pattern);
+        if (match) {
+          const year = parseInt(match[1]);
+          // Validate year is reasonable (1800-2026)
+          if (year >= 1800 && year <= 2026) {
+            data.yearBuilt = year.toString();
+            break;
+          }
+        }
+      }
 
-      return { sqFt, yearBuilt };
+      return data;
     });
 
-    console.log(`[Zillow] Found: SqFt=${result?.sqFt}, Year=${result?.yearBuilt}`);
+    console.log(`[DuckDuckGo] Found: SqFt=${result?.sqFt}, Year=${result?.yearBuilt}`);
 
   } catch (err) {
-    console.log(`[Zillow] Error: ${err.message}`);
+    console.log(`[DuckDuckGo] Error: ${err.message}`);
   } finally {
+    await context.close();
     await browser.close();
   }
 
   return result;
 }
-
-// ============================================
-// REDFIN SCRAPER (Fallback)
-// ============================================
-async function scrapeRedfin(address, zipCode) {
-  console.log(`[Redfin] Searching: ${address}, ${zipCode}`);
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
-  let result = null;
-
-  try {
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-
-    // Search Redfin
-    const searchUrl = `https://www.redfin.com/zipcode/${zipCode}/filter/${encodeURIComponent(address)}`;
-    await page.goto(searchUrl, { timeout: 15000, waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(2000);
-
-    // Extract data
-    result = await page.evaluate(() => {
-      const sqFtSelector = document.querySelector('[data-rn-test="home-details-summary-term-sqft"], .sqft, .fact-row:has-text("sqft")');
-      const yearSelector = document.querySelector('[data-rn-test="home-details-summary-term-year-built"], .year-built, .fact-row:has-text("Year Built")');
-
-      const extractNum = (el) => {
-        if (!el) return null;
-        const match = el.textContent?.match(/[\d,]+/);
-        return match ? match[0].replace(/,/g, '') : null;
-      };
-
-      return {
-        sqFt: extractNum(sqFtSelector),
-        yearBuilt: extractNum(yearSelector)
-      };
-    });
-
-    console.log(`[Redfin] Found: SqFt=${result?.sqFt}, Year=${result?.yearBuilt}`);
-
-  } catch (err) {
-    console.log(`[Redfin] Error: ${err.message}`);
-  } finally {
-    await browser.close();
-  }
-
-  return result;
-}
+*/
 
 // ============================================
 // API ENDPOINTS
@@ -223,28 +196,31 @@ app.get('/api/property', async (req, res) => {
 
   console.log(`[API] Cache MISS for ${cacheKey}`);
 
-  // Scrape from sources
-  let result = null;
-  let source = null;
+  // Scrape using unified scraper with fallback chain
+  let result;
+  let source;
 
-  // Try Zillow first
-  result = await scrapeZillow(address, zip);
-  if (result && (result.sqFt || result.yearBuilt)) {
-    source = 'zillow';
-  }
-
-  // Fallback to Redfin
-  if (!result || (!result.sqFt && !result.yearBuilt)) {
-    result = await scrapeRedfin(address, zip);
-    if (result && (result.sqFt || result.yearBuilt)) {
-      source = 'redfin';
-    }
+  try {
+    result = await retryWithBackoff(
+      () => scrapeProperty(address, zip),
+      { maxAttempts: 3, baseDelayMs: 1000 }
+    );
+    source = result?.squareFootage || result?.yearBuilt ? 'unified-scraper' : null;
+  } catch (error) {
+    console.error(`[API] Scraping failed: ${error.message}`);
+    return res.status(500).json({
+      error: error.message,
+      code: error.code || 'SCRAPING_ERROR'
+    });
   }
 
   // Cache the result
   if (result) {
     propertyCache[cacheKey] = {
-      data: result,
+      data: {
+        sqFt: result.squareFootage,
+        yearBuilt: result.yearBuilt
+      },
       timestamp: Date.now(),
       source
     };
@@ -252,14 +228,17 @@ app.get('/api/property', async (req, res) => {
 
     return res.json({
       source,
-      data: result
+      data: {
+        sqFt: result.squareFootage,
+        yearBuilt: result.yearBuilt
+      }
     });
   }
 
   // No data found
   return res.status(404).json({
     error: 'Property data not found',
-    message: 'Could not find property data on Zillow or Redfin'
+    message: 'Could not find property data via Zillow or Redfin'
   });
 });
 
