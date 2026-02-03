@@ -1,0 +1,134 @@
+# SCE Rebate Center Automation
+
+Project for automating the SCE (Southern California Edison) Rebate Center workflow at `sce.dsmcentral.com`.
+
+## Project Structure
+
+```
+SCE/
+├── ANALYSIS_REPORT.md          # Comprehensive workflow analysis
+├── sce-helper.user.js           # Tampermonkey automation script
+├── CasePackets/                 # Case data storage
+│   └── template/               # Template structure for new cases
+│       ├── intake.md           # Case intake form
+│       ├── inputs/             # Data templates
+│       ├── evidence/           # HAR files, screenshots
+│       ├── uploads/            # Photos, documents
+│       └── outputs/            # Generated reports
+└── README.md                   # This file
+```
+
+## Quick Start
+
+### 1. Install Tampermonkey Script
+
+1. Install [Tampermonkey](https://www.tampermonkey.net/) for your browser
+2. Create a new script
+3. Copy the contents of `sce-helper.user.js`
+4. Save and enable the script
+5. Visit `https://sce.dsmcentral.com/onsite`
+
+### 2. Use Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+Shift+→` | Go to next incomplete section |
+| `Ctrl+Shift+S` | Save current form |
+| `Ctrl+Shift+F` | Fill fields from clipboard (JSON) |
+
+### 3. Console Commands
+
+Open browser DevTools (F12) and use:
+
+```javascript
+// Jump to a specific section
+SCEHelper.goToSection('Project Information');
+SCEHelper.goToSection(8); // by index
+
+// Fill individual field
+SCEHelper.fillField('Total Sq.Ft.', '1500');
+
+// Fill from JSON object
+SCEHelper.fillFromJSON('{"Total Sq.Ft.": "1500", "Year Built": "1960"}');
+
+// Export current form data
+console.log(SCEHelper.exportData());
+```
+
+## Case Packet Template
+
+When starting a new case:
+
+1. Copy the template folder:
+   ```bash
+   cp -r CasePackets/template CasePackets/2026-01-29__{appId}__{address}
+   ```
+
+2. Fill out `intake.md` with case details
+
+3. Save JSON data in `inputs/` folder
+
+4. Collect evidence (screenshots, HAR files) in `evidence/`
+
+5. Run automation and save logs to `outputs/`
+
+## Section Menu Reference
+
+Based on clickstream analysis, sections include:
+
+| # | Name | Notes |
+|---|------|-------|
+| 1 | *(summary)* | Home/overview |
+| 2 | Appointments | Scheduling |
+| 3 | Trade Ally Information | Contractor details |
+| 4 | Additional Customer Information | Customer details |
+| 8 | Project Information | Property info (SqFt, Year Built) |
+| 9 | Assessment Questionnaire | Main form |
+| 11 | Basic Enrollment | Program enrollment |
+
+## API Endpoints (for reference)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `dynamicOptions.json` | Get dropdown options |
+| `saveAndCalculate.json` | Save form, recalculate |
+| `customer_applications.json` | List applications |
+| `spaces.json` | Get room/space data |
+
+## Data Flow
+
+```
+External Sources (Zillow, Assessor)
+    ↓
+Pre-fill JSON templates
+    ↓
+Browser automation (Tampermonkey/Playwright)
+    ↓
+SCE Rebate Center forms
+    ↓
+Case Packet evidence & outputs
+```
+
+## Missing Evidence Needed
+
+To fully automate section visibility rules, we need:
+
+1. **HAR file with response bodies** - Current HAR (175MB) has empty responses
+2. **Qualified vs. not-qualified comparison** - To determine eligibility logic
+3. **Form definition JSON** - Validation rules and dependencies
+4. **Document requirements list** - Per-measure document needs
+
+## Notes
+
+- The application uses Angular (Material Design)
+- IDs are dynamic (`mat-input-N`) - use aria-labels or stable selectors
+- Section visibility is controlled server-side via `saveAndCalculate` response
+- Photo uploads require individual file selection per field
+
+## TODO
+
+- [ ] Create Playwright test suite
+- [ ] Build property data scraper (Zillow/County Assessor)
+- [ ] Develop measure templates library
+- [ ] Implement bulk photo uploader
+- [ ] Document section unlock triggers (requires API response analysis)
