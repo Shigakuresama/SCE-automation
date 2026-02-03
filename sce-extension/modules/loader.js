@@ -18,10 +18,10 @@ const SectionLoader = {
     }
   },
 
-  async fillSection(sectionName, config) {
+  async fillSection(sectionName, config, helpers = {}) {
     const module = await this.load(sectionName);
     if (module && module.fill) {
-      return module.fill(config);
+      return module.fill(config, helpers);
     }
     console.warn(`No fill handler for section: ${sectionName}`);
     return false;

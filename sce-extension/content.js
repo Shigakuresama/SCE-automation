@@ -3,6 +3,8 @@
  * Runs on SCE pages to detect forms and fill them
  */
 
+import { SectionLoader } from './modules/loader.js';
+
 console.log('[SCE Auto-Fill] Content script loaded');
 
 // ============================================
@@ -1151,54 +1153,14 @@ async function fillAdditionalCustomerInfo() {
 }
 
 async function fillProjectInformation() {
-  log('📋 Filling Project Information (Phase 3)...');
-  await sleep(500);
-
-  // Get property data from proxy (with fallback to config)
-  const propertyData = await fetchPropertyDataFromProxy(
-    config.address,
-    config.zipCode
-  );
-
-  // Space Or Unit (on this page too) - skip if filled (doesn't come from Zillow)
-  const spaceLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Space Or Unit'));
-  if (spaceLabel) {
-    const formField = spaceLabel.closest('mat-form-field');
-    if (formField) {
-      const input = formField.querySelector('input');
-      if (input) {
-        await setInputValue(input, config.spaceOrUnit, 'Space Or Unit', true);
-      }
-    }
-  }
-
-  // Fill Total Sq.Ft. from property data - ALWAYS fill (skipIfFilled = false)
-  const sqFtLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Total Sq') || l.textContent.includes('Square Foot'));
-  if (sqFtLabel) {
-    const formField = sqFtLabel.closest('mat-form-field');
-    if (formField) {
-      const input = formField.querySelector('input');
-      if (input) {
-        const sqFtValue = propertyData.sqFt || '1200';
-        await setInputValue(input, sqFtValue, 'Total Sq.Ft.', false);
-      }
-    }
-  }
-
-  // Fill Year Built from property data - ALWAYS fill (skipIfFilled = false)
-  const yearLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Year Built'));
-  if (yearLabel) {
-    const formField = yearLabel.closest('mat-form-field');
-    if (formField) {
-      const input = formField.querySelector('input');
-      if (input) {
-        const yearValue = propertyData.yearBuilt || '1970';
-        await setInputValue(input, yearValue, 'Year Built', false);
-      }
-    }
-  }
-
-  log('✅ Project Information filled!');
+  // Use lazy-loaded section module with helpers
+  const helpers = {
+    log,
+    sleep,
+    setInputValue,
+    fetchPropertyDataFromProxy
+  };
+  return SectionLoader.fillSection('project', config, helpers);
 }
 
 async function fillTradeAllyInformation() {
