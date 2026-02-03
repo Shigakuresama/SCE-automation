@@ -395,7 +395,23 @@ async function fetchPropertyDataFromProxy(address, zipCode) {
     }
   } catch (err) {
     log(`  ⚠️ Proxy fetch failed: ${err.message}`);
-    showError('Failed to fetch property data', err.message);
+
+    // Provide specific, actionable error messages
+    let userMessage = 'Failed to fetch property data';
+    let details = err.message;
+
+    if (err.name === 'TypeError' && err.message.includes('fetch')) {
+      userMessage = 'Cannot connect to proxy server';
+      details = 'Ensure the SCE proxy server is running on localhost:3000. Run: cd sce-proxy-server && npm start';
+    } else if (err.message.includes('ECONNREFUSED')) {
+      userMessage = 'Proxy server not running';
+      details = 'Start the proxy server with: cd sce-proxy-server && npm start';
+    } else if (err.message.includes('timeout')) {
+      userMessage = 'Property data request timed out';
+      details = 'The scraping service is taking too long. Try again in a moment.';
+    }
+
+    showError(userMessage, details);
   }
 
   // Fallback to config values

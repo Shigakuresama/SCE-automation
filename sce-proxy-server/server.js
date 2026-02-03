@@ -30,6 +30,7 @@ app.use(express.json());
 
 // Property cache
 let propertyCache = {};
+let cacheCleanupInterval = null;
 
 // Load cache from disk
 async function loadCache() {
@@ -38,8 +39,20 @@ async function loadCache() {
     propertyCache = JSON.parse(data);
     console.log(`[Cache] Loaded ${Object.keys(propertyCache).length} cached properties`);
   } catch (err) {
+    if (err.code === 'ENOENT') {
+      console.log('[Cache] No existing cache found, starting fresh');
+    } else if (err instanceof SyntaxError) {
+      console.error('[Cache] Cache file corrupted, backing up and starting fresh');
+      // Backup corrupted file for debugging
+      try {
+        await fs.rename(CACHE_FILE, `${CACHE_FILE}.corrupted.${Date.now()}`);
+      } catch (renameErr) {
+        console.error('[Cache] Failed to backup corrupted cache file:', renameErr.message);
+      }
+    } else {
+      console.error('[Cache] Error loading cache:', err.message);
+    }
     propertyCache = {};
-    console.log('[Cache] No existing cache found, starting fresh');
   }
 }
 
@@ -48,7 +61,13 @@ async function saveCache() {
   try {
     await fs.writeFile(CACHE_FILE, JSON.stringify(propertyCache, null, 2));
   } catch (err) {
-    console.error('[Cache] Failed to save:', err.message);
+    console.error('[Cache] Failed to save cache:', err.message);
+    console.error('[Cache] Property data will not be cached between requests');
+    // Track failure count and alert after repeated failures
+    saveCache.failureCount = (saveCache.failureCount || 0) + 1;
+    if (saveCache.failureCount >= 5) {
+      console.error('[Cache] CRITICAL: Multiple cache save failures - check disk space and permissions');
+    }
   }
 }
 
@@ -58,7 +77,7 @@ function getCacheKey(address, zipCode) {
 }
 
 // Clean expired cache entries
-function cleanExpiredCache() {
+async function cleanExpiredCache() {
   const now = Date.now();
   let cleaned = 0;
   for (const [key, value] of Object.entries(propertyCache)) {
@@ -69,7 +88,7 @@ function cleanExpiredCache() {
   }
   if (cleaned > 0) {
     console.log(`[Cache] Cleaned ${cleaned} expired entries`);
-    saveCache();
+    await saveCache();
   }
 }
 
@@ -298,12 +317,28 @@ app.delete('/api/cache', async (req, res) => {
 // ============================================
 async function startServer() {
   await loadCache();
-  cleanExpiredCache();
+  await cleanExpiredCache();
 
-  // Clean cache every hour
-  setInterval(cleanExpiredCache, 60 * 60 * 1000);
+  // Clean cache every hour - store interval for cleanup
+  cacheCleanupInterval = setInterval(() => {
+    cleanExpiredCache().catch(err => {
+      console.error('[Cache] Failed to clean expired entries:', err.message);
+    });
+  }, 60 * 60 * 1000);
 
-  app.listen(PORT, () => {
+  // Handle graceful shutdown
+  process.on('SIGTERM', gracefulShutdown);
+  process.on('SIGINT', gracefulShutdown);
+
+  function gracefulShutdown() {
+    console.log('[Server] Shutting down gracefully...');
+    if (cacheCleanupInterval) {
+      clearInterval(cacheCleanupInterval);
+    }
+    process.exit(0);
+  }
+
+  const server = app.listen(PORT, () => {
     console.log(`
 ╔═══════════════════════════════════════════╗
 ║   SCE Proxy Server Running                ║
@@ -312,6 +347,8 @@ async function startServer() {
 ╚═══════════════════════════════════════════╝
     `);
   });
+
+  return server;
 }
 
 startServer().catch(console.error);

@@ -44,6 +44,9 @@
   },
   "web_accessible_resources": [{
     "resources": ["sections/*.js", "modules/*.js"],
-    "matches": ["https://sce.dsmcentral.com/*"]
+    "matches": [
+      "https://sce.dsmcentral.com/*",
+      "https://sce-trade-ally-community.my.site.com/*"
+    ]
   }]
 }

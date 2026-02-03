@@ -71,8 +71,23 @@ export async function scrapeZillow(address, zipCode) {
 
     return { squareFootage, yearBuilt };
   } catch (error) {
-    if (error instanceof ScrapingError) throw error;
-    throw new ScrapingError(searchUrl, error.message);
+    if (error instanceof ScrapingError) {
+      throw error;
+    }
+
+    // Preserve network error type for retry logic
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new NetworkError(`Failed to fetch ${searchUrl}: ${error.message}`, {
+        originalError: error.name,
+        url: searchUrl
+      });
+    }
+
+    // Unknown error - still wrap but preserve more context
+    throw new ScrapingError(searchUrl, error.message, {
+      originalError: error.name,
+      stack: error.stack
+    });
   }
 }
 

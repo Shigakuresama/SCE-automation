@@ -86,38 +86,72 @@ export async function scrapeRedfin(address, zipCode) {
       }
     }
 
-    // If we haven't found data yet, try broader search
+    // If we haven't found data yet, try broader search within content containers
     if (!squareFootage) {
-      $('*').each((i, el) => {
-        if (squareFootage) return false; // Stop if found
-        const text = $(el).text();
-        if (text.includes('sqft') || text.includes('Sq Ft') || text.includes('Square Feet')) {
-          const match = text.match(/([\d,]+)\s*(?:sqft|sq\.ft\.|Square Feet)/i);
-          if (match) {
-            const sqft = parseInt(match[1].replace(/,/g, ''), 10);
-            if (sqft > 100) {
-              squareFootage = sqft;
+      // Search within likely content containers instead of entire DOM
+      const contentSelectors = [
+        '.home-main-stats-variant',
+        '.stats',
+        '.property-info',
+        '.details-section',
+        'main',
+        '#content',
+        '.content'
+      ];
+
+      for (const containerSelector of contentSelectors) {
+        const $container = $(containerSelector);
+        if ($container.length === 0) continue;
+
+        $container.find('*').each((i, el) => {
+          if (squareFootage) return false; // Stop if found
+          const text = $(el).text();
+          if (text.includes('sqft') || text.includes('Sq Ft') || text.includes('Square Feet')) {
+            const match = text.match(/([\d,]+)\s*(?:sqft|sq\.ft\.|Square Feet)/i);
+            if (match) {
+              const sqft = parseInt(match[1].replace(/,/g, ''), 10);
+              if (sqft > 100) {
+                squareFootage = sqft;
+              }
             }
           }
-        }
-      });
+        });
+
+        if (squareFootage) break; // Found it, stop searching
+      }
     }
 
     if (!yearBuilt) {
-      $('*').each((i, el) => {
-        if (yearBuilt) return false; // Stop if found
-        const text = $(el).text();
-        if (text.includes('Year Built') || text.includes('Built in')) {
-          const match = text.match(/(?:Year Built|Built in)[:\s]*(19|20)\d{2}/i);
-          if (match) {
-            const year = parseInt(match[1], 10);
-            const currentYear = new Date().getFullYear();
-            if (year >= 1800 && year <= currentYear + 1) {
-              yearBuilt = year;
+      // Same approach for year built - search within containers
+      const contentSelectors = [
+        '.key-value-list',
+        '.details-section',
+        '.property-info',
+        'main',
+        '#content'
+      ];
+
+      for (const containerSelector of contentSelectors) {
+        const $container = $(containerSelector);
+        if ($container.length === 0) continue;
+
+        $container.find('*').each((i, el) => {
+          if (yearBuilt) return false; // Stop if found
+          const text = $(el).text();
+          if (text.includes('Year Built') || text.includes('Built in')) {
+            const match = text.match(/(?:Year Built|Built in)[:\s]*(19|20)\d{2}/i);
+            if (match) {
+              const year = parseInt(match[1], 10);
+              const currentYear = new Date().getFullYear();
+              if (year >= 1800 && year <= currentYear + 1) {
+                yearBuilt = year;
+              }
             }
           }
-        }
-      });
+        });
+
+        if (yearBuilt) break; // Found it, stop searching
+      }
     }
 
     if (!squareFootage && !yearBuilt) {

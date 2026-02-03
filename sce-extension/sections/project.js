@@ -72,6 +72,12 @@ export async function fill(config, helpers) {
   } catch (error) {
     console.error('Error filling Project section:', error);
     log('❌ Error filling Project Information:', error.message);
+
+    // Notify user if helpers available
+    if (helpers && helpers.showError) {
+      helpers.showError('Failed to fill Project Information', error.message);
+    }
+
     return false;
   }
 }
