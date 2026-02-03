@@ -125,6 +125,105 @@ let config = {
 };
 
 // ============================================
+// STOP CONTROL
+// ============================================
+let isStopped = false;
+let stopButton = null;
+
+/**
+ * Stop the form filling process
+ */
+function stopFormFilling() {
+  isStopped = true;
+  log('⏹️ Form filling stopped by user');
+
+  // Update banner to show stopped state
+  const banner = document.getElementById('sce-autofill-banner');
+  if (banner) {
+    banner.classList.remove('sce-filling');
+    banner.classList.add('sce-stopped');
+    banner.querySelector('.sce-banner-text').textContent = '⏹️ Stopped';
+
+    // Show error banner with message
+    showError('Process Stopped', 'Form filling was stopped by the user');
+  }
+
+  // Hide stop button
+  if (stopButton) {
+    stopButton.style.display = 'none';
+  }
+
+  // Re-enable other buttons
+  const fillAllBtn = document.getElementById('sce-fill-all-btn');
+  const fillSectionBtn = document.getElementById('sce-fill-section-btn');
+  if (fillAllBtn) {
+    fillAllBtn.disabled = false;
+    fillAllBtn.style.opacity = '1';
+    fillAllBtn.style.pointerEvents = 'auto';
+  }
+  if (fillSectionBtn) {
+    fillSectionBtn.disabled = false;
+    fillSectionBtn.style.opacity = '1';
+    fillSectionBtn.style.pointerEvents = 'auto';
+  }
+}
+
+/**
+ * Check if process was stopped and throw if so
+ * @throws {Error} If process was stopped
+ */
+function checkStopped() {
+  if (isStopped) {
+    throw new Error('Process was stopped by user');
+  }
+}
+
+/**
+ * Create and show the stop button
+ */
+function showStopButton() {
+  // Remove existing stop button
+  if (stopButton) {
+    stopButton.remove();
+  }
+
+  stopButton = document.createElement('button');
+  stopButton.id = 'sce-stop-btn';
+  stopButton.className = 'sce-btn sce-btn-stop';
+  stopButton.textContent = '⏹ Stop';
+  stopButton.onclick = stopFormFilling;
+
+  // Add to banner
+  const banner = document.getElementById('sce-autofill-banner');
+  if (banner) {
+    const content = banner.querySelector('.sce-banner-content');
+    if (content) {
+      content.appendChild(stopButton);
+    }
+  }
+}
+
+/**
+ * Hide the stop button
+ */
+function hideStopButton() {
+  if (stopButton) {
+    stopButton.style.display = 'none';
+  }
+}
+
+/**
+ * Reset the stop state (allow restart)
+ */
+function resetStopState() {
+  isStopped = false;
+  const banner = document.getElementById('sce-autofill-banner');
+  if (banner) {
+    banner.classList.remove('sce-stopped');
+  }
+}
+
+// ============================================
 // CONFIG LOADING (async with Promise to prevent race conditions)
 // ============================================
 let configLoadPromise = null;
@@ -2045,6 +2144,9 @@ async function runFillCurrentSectionOnly(banner) {
   // Wait for Angular stability
   await waitForAngularStability(3000);
 
+  // Check if stopped before executing
+  checkStopped();
+
   // Execute the fill action for this section only
   try {
     if (step.action === fillCustomFieldsOnly) {
@@ -2059,6 +2161,9 @@ async function runFillCurrentSectionOnly(banner) {
       await step.action();
     }
 
+    // Check again after main action
+    checkStopped();
+
     // Also fill custom fields for this section
     const sectionTitle = step.name || activeTitle;
     if (step.action !== fillCustomFieldsOnly && step.action !== fillCustomerSearch) {
@@ -2069,6 +2174,10 @@ async function runFillCurrentSectionOnly(banner) {
     log(`✅ ${activeTitle} filled!`);
     updateBannerButtonSuccess(banner);
   } catch (err) {
+    // Re-throw if it's a stop error so it propagates to the top level
+    if (err.message === 'Process was stopped by user') {
+      throw err;
+    }
     log(`  ⚠️ Error: ${err.message}`);
     updateBannerButtonError(banner, err.message);
   } finally {
@@ -2121,6 +2230,9 @@ async function runFillForm() {
 
   // Execute workflow from start index
   for (let i = startIndex; i < workflow.length; i++) {
+    // Check if user stopped the process
+    checkStopped();
+
     const step = workflow[i];
     log(`\n📌 [${i + 1}/${workflow.length}] ${step.name}`);
 
@@ -2131,6 +2243,8 @@ async function runFillForm() {
       if (sectionTitle && goToSectionTitle(sectionTitle)) {
         log(`  ✓ Navigated to: ${sectionTitle}`);
         await sleep(1000);
+        // Check again after navigation
+        checkStopped();
       } else if (step.key === 'customer-search') {
         log(`  ✓ Starting fresh from Customer Search`);
       } else if (step.key === 'measure-info' || step.key === 'summary-info' || step.key === 'application-status') {
@@ -2140,12 +2254,17 @@ async function runFillForm() {
           nextBtn.click();
           log(`  ✓ Clicked Next button to reach ${step.name}`);
           await waitForPage(step.key, 8000);
+          // Check again after navigation
+          checkStopped();
         }
       }
     }
 
     // Wait for page stability
     await waitForAngularStability(4000);
+
+    // Check again before executing action
+    checkStopped();
 
     // Execute the action for this step
     try {
@@ -2160,9 +2279,16 @@ async function runFillForm() {
         await step.action();
       }
     } catch (err) {
+      // Re-throw if it's a stop error so it propagates to the top level
+      if (err.message === 'Process was stopped by user') {
+        throw err;
+      }
       log(`  ⚠️ Error in ${step.name}: ${err.message}`);
       showError(`Error in ${step.name}`, err.message);
     }
+
+    // Check if stopped during action execution
+    checkStopped();
 
     // Fill custom fields for this section
     const sectionTitle = keyToSectionTitle(step.key) || step.name;
@@ -2232,25 +2358,50 @@ function showBanner() {
       <span class="sce-banner-text">📋 SCE Form Detected</span>
       <button id="sce-fill-all-btn" class="sce-btn sce-btn-primary">Fill All Sections</button>
       <button id="sce-fill-section-btn" class="sce-btn sce-btn-secondary">${sectionBtnText}</button>
+      <button id="sce-stop-btn" class="sce-btn sce-btn-stop" style="display: none;">⏹ Stop</button>
       <button id="sce-dismiss-btn" class="sce-btn sce-btn-tertiary">✕</button>
     </div>
   `;
   document.body.appendChild(banner);
 
+  // Store reference to stop button
+  stopButton = document.getElementById('sce-stop-btn');
+
   // Attach event listeners
   document.getElementById('sce-fill-all-btn').addEventListener('click', () => {
+    resetStopState();
     banner.classList.add('sce-filling');
+    showStopButton();
     runFillForm().then(() => {
       banner.classList.add('sce-success');
       banner.querySelector('.sce-banner-text').textContent = '✅ Form Filled!';
+      hideStopButton();
       setTimeout(() => banner.remove(), 3000);
+    }).catch((err) => {
+      if (err.message === 'Process was stopped by user') {
+        // Already handled by stopFormFilling
+      } else {
+        banner.querySelector('.sce-banner-text').textContent = '❌ Error';
+        updateBannerButtonError(banner, err.message);
+      }
+      hideStopButton();
     });
   });
 
   document.getElementById('sce-fill-section-btn').addEventListener('click', () => {
+    resetStopState();
     banner.classList.add('sce-filling');
+    showStopButton();
     runFillCurrentSectionOnly(banner).then(() => {
       // Banner stays visible, button shows success briefly
+      hideStopButton();
+    }).catch((err) => {
+      if (err.message === 'Process was stopped by user') {
+        // Already handled by stopFormFilling
+      } else {
+        updateBannerButtonError(banner, err.message);
+      }
+      hideStopButton();
     });
   });
 

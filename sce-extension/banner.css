@@ -73,6 +73,35 @@
   background: #e0e0e0;
 }
 
+.sce-btn-stop {
+  background: #f44336;
+  color: white;
+}
+
+.sce-btn-stop:hover {
+  background: #d32f2f;
+  transform: scale(1.05);
+}
+
+#sce-autofill-banner.sce-filling .sce-btn-stop {
+  opacity: 1;
+  pointer-events: auto;
+  animation: scePulse 1.5s infinite;
+}
+
+@keyframes scePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(244, 67, 54, 0);
+  }
+}
+
+#sce-autofill-banner.sce-stopped {
+  background: #ffebee;
+}
+
 .sce-btn.sce-success {
   background: #4CAF50;
   color: white;
