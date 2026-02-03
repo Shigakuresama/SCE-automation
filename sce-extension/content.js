@@ -4,6 +4,7 @@
  */
 
 import { SectionLoader } from './modules/loader.js';
+import { showError, showWarning, showInfo } from './modules/error-banner.js';
 
 console.log('[SCE Auto-Fill] Content script loaded');
 
@@ -230,6 +231,7 @@ async function checkProxyStatus(force = false) {
     return proxyAvailable;
   } catch (err) {
     log(`  ⚠️ Proxy health check failed: ${err.name} - ${err.message}`);
+    showWarning(`Proxy server health check failed: ${err.name}`);
     proxyAvailable = false;
     return false;
   }
@@ -290,9 +292,11 @@ async function fetchPropertyDataFromProxy(address, zipCode) {
       return zillowData;
     } else {
       log(`  ⚠️ Proxy returned ${response.status} - using config values`);
+      showWarning(`Property data unavailable (HTTP ${response.status}). Using configured values.`);
     }
   } catch (err) {
     log(`  ⚠️ Proxy fetch failed: ${err.message}`);
+    showError('Failed to fetch property data', err.message);
   }
 
   // Fallback to config values
@@ -565,10 +569,12 @@ function parseCustomFieldMap() {
     // Reject arrays explicitly (typeof array === 'object' is true)
     if (Array.isArray(data)) {
       log(`  ⚠️ Custom field map must be an object, not an array`);
+      showWarning('Custom Field Map must be an object, not an array. Using default fields.');
       return {};
     }
     // Reject non-objects
     if (!data || typeof data !== 'object') {
+      showWarning('Custom Field Map must be a valid object. Using default fields.');
       return {};
     }
     // Protect against prototype pollution - create safe object
@@ -583,6 +589,7 @@ function parseCustomFieldMap() {
     return safe;
   } catch (err) {
     log(`  ⚠️ Invalid custom field map JSON: ${err.message}`);
+    showWarning(`Invalid Custom Field Map: ${err.message}. Using default fields.`);
     return {};
   }
 }
@@ -2154,6 +2161,7 @@ async function runFillForm() {
       }
     } catch (err) {
       log(`  ⚠️ Error in ${step.name}: ${err.message}`);
+      showError(`Error in ${step.name}`, err.message);
     }
 
     // Fill custom fields for this section
@@ -2357,6 +2365,7 @@ function setupSidebarObserver() {
       }
     } catch (err) {
       log('  ⚠️ Sidebar observer error: ' + err.message);
+      showWarning('Sidebar observer error: ' + err.message);
     }
   });
 
