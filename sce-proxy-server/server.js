@@ -21,6 +21,9 @@ const PORT = 3000;
 const CACHE_FILE = path.join(__dirname, 'property-cache.json');
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+// Load version from package.json
+const { version } = JSON.parse(await fs.readFile(path.join(__dirname, 'package.json'), 'utf8'));
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -159,6 +162,14 @@ async function scrapeDuckDuckGo(address, zipCode) {
 // ============================================
 
 // Health check
+app.get('/proxy/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
