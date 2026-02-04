@@ -211,6 +211,30 @@ function testOptionsSideValidation() {
   console.log('✅ testOptionsSideValidation passed');
 }
 
+/**
+ * Test edge cases
+ */
+function testEdgeCases() {
+  console.log('Testing edge cases...');
+
+  // Test address with period in street type (already works)
+  const result1 = parseAddress("1909 W Martha St., Santa Ana, CA 92706");
+  if (result1.street !== 'W Martha St.') {
+    throw new Error('Street type period test failed: should preserve period');
+  }
+  if (result1.number !== '1909') {
+    throw new Error('Street type period test failed: number incorrect');
+  }
+
+  // Test single digit house number
+  const result2 = parseAddress("5 W Martha Ln, Santa Ana, CA 92706");
+  if (result2.number !== '5') {
+    throw new Error('Single digit test failed: should handle single digit');
+  }
+
+  console.log('✅ testEdgeCases passed');
+}
+
 // Run tests
 try {
   testParseAddress();
@@ -220,6 +244,7 @@ try {
   testStreetAndZipConsistency();
   testMaxRangeCheck();
   testOptionsSideValidation();
+  testEdgeCases();
   console.log('\n=====================================');
   console.log('✅ ALL ADDRESS GENERATOR TESTS PASSED!');
   console.log('=====================================');

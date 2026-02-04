@@ -129,9 +129,11 @@ function captureCustomerDataFromPage() {
     // Fallback: look for phone pattern in all inputs
     if (!homeownerPhone) {
       const allInputs = Array.from(document.querySelectorAll('input'));
+      const phoneRegex = /^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$/;
+
       for (const input of allInputs) {
         const value = input.value?.trim();
-        if (value && /^\d{10}|\(\d{3}\)\s*\d{3}[-\s]?\d{4}/.test(value.replace(/\D/g, ''))) {
+        if (value && phoneRegex.test(value)) {
           homeownerPhone = value;
           break;
         }

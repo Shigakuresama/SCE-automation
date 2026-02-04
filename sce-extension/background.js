@@ -93,14 +93,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   }
-
-  // Generate PDF from processed addresses (from popup)
-  if (request.action === 'generateRoutePDF') {
-    handlePDFGeneration(request.addresses)
-      .then(result => sendResponse({ success: true, ...result }))
-      .catch(error => sendResponse({ success: false, error: error.message }));
-    return true;
-  }
 });
 
 /**
@@ -273,77 +265,4 @@ async function captureCustomerData(tabId, address) {
       qualified: false
     };
   }
-}
-
-// ============================================
-// PDF GENERATION
-// ============================================
-
-/**
- * Handle PDF generation from processed addresses
- * @param {Array<Object>} addresses - Array of processed address objects
- * @returns {Promise<Object>} PDF generation result
- */
-async function handlePDFGeneration(addresses) {
-  try {
-    // Import jsPDF library
-    const jsPDF = await importJSPLibrary();
-
-    if (!jsPDF) {
-      throw new Error('jsPDF library not available');
-    }
-
-    // Generate PDF using the pdf-generator module
-    const pdfData = SCERouteProcessor.generateRoutePDF(addresses);
-
-    // Create download
-    chrome.downloads.download({
-      url: pdfData.dataUrl,
-      filename: pdfData.filename,
-      saveAs: true
-    }, (downloadId) => {
-      if (chrome.runtime.lastError) {
-        console.error('[SCE Auto-Fill] PDF download error:', chrome.runtime.lastError);
-      } else {
-        console.log(`[SCE Auto-Fill] PDF download started: ${downloadId}`);
-      }
-    });
-
-    return {
-      success: true,
-      filename: pdfData.filename
-    };
-
-  } catch (error) {
-    console.error('[SCE Auto-Fill] PDF generation error:', error);
-    throw error;
-  }
-}
-
-/**
- * Dynamically import jsPDF library
- * @returns {Promise<Object>} jsPDF constructor
- */
-async function importJSPLibrary() {
-  return new Promise((resolve) => {
-    // Try to load from web accessible resource
-    fetch(chrome.runtime.getURL('lib/jspdf.umd.min.js'))
-      .then(response => response.text())
-      .then(code => {
-        // Execute the code in a clean context
-        const script = document.createElement('script');
-        script.textContent = code;
-        document.head.appendChild(script);
-
-        // jsPDF should now be available globally
-        if (typeof window.jspdf !== 'undefined') {
-          resolve(window.jspdf.jsPDF);
-        } else {
-          resolve(null);
-        }
-
-        document.head.removeChild(script);
-      })
-      .catch(() => resolve(null));
-  });
 }

@@ -99,6 +99,24 @@ export function generateCanvassPDF(cases, options = {}) {
     format = 'letter'
   } = options;
 
+  // Validate input
+  if (!Array.isArray(cases) || cases.length === 0) {
+    throw new Error('Cases array is required and must not be empty');
+  }
+
+  // Validate each case has required fields
+  cases.forEach((caseData, index) => {
+    if (!caseData || typeof caseData !== 'object') {
+      throw new Error(`Case at index ${index} is not an object`);
+    }
+
+    // Get address from either 'address' or 'full' field
+    const address = caseData.address || caseData.full;
+    if (!address) {
+      throw new Error(`Case at index ${index} missing required field: address or full`);
+    }
+  });
+
   // Access jsPDF from global scope (loaded via lib/jspdf.umd.min.js)
   const jsPDF = window.jspdf?.jsPDF;
   if (!jsPDF) {

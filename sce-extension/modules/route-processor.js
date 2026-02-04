@@ -3,102 +3,12 @@
  * Background batch processing for address routing and data collection
  */
 
-// Default configuration for route processing
-const ROUTE_CONFIG = {
-  captureDelay: 5000,           // 5 seconds for page load and data capture
-  tabOpenDelay: 2000,           // 2 seconds between opening tabs
-  screenshotDelay: 1000,        // 1 second before screenshot
-  maxConcurrentTabs: 3,         // Maximum tabs to process concurrently
-  maxBatchSize: 50,             // Maximum addresses in single batch
-  retryAttempts: 2,             // Retry failed addresses
-  retryDelay: 3000,             // Delay before retry (ms)
-  progressBarUpdateInterval: 500 // Update progress every 500ms
-};
+import { sleep, sendToContentScript, openTab, closeTab, captureScreenshot } from './route-processor-utils.js';
+import { ROUTE_CONFIG, activeBatches, processRouteBatch as processBatchInternal } from './route-processor-batch.js';
 
-// Active batch storage
-const activeBatches = new Map();
-
-/**
- * Generate unique batch ID
- * @returns {string} Unique batch identifier
- */
+// Generate unique batch ID
 function generateBatchId() {
   return `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
- * Sleep utility
- * @param {number} ms - Milliseconds to sleep
- * @returns {Promise<void>}
- */
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * Send message to content script
- * @param {number} tabId - Tab ID
- * @param {Object} message - Message object
- * @returns {Promise<Object>} Response from content script
- */
-function sendToContentScript(tabId, message) {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.sendMessage(tabId, message, (response) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-      } else {
-        resolve(response);
-      }
-    });
-  });
-}
-
-/**
- * Open new tab with SCE form
- * @param {string} url - URL to open
- * @returns {Promise<number>} Tab ID
- */
-function openTab(url) {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.create({ url, active: false }, (tab) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-      } else {
-        resolve(tab.id);
-      }
-    });
-  });
-}
-
-/**
- * Close tab
- * @param {number} tabId - Tab ID to close
- * @returns {Promise<void>}
- */
-function closeTab(tabId) {
-  return new Promise((resolve) => {
-    chrome.tabs.remove(tabId, () => {
-      // Ignore errors if tab already closed
-      resolve();
-    });
-  });
-}
-
-/**
- * Capture visible tab screenshot
- * @param {number} tabId - Tab ID
- * @returns {Promise<string>} Data URL of screenshot
- */
-function captureScreenshot(tabId) {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.captureVisibleTab(tabId, { format: 'png' }, (dataUrl) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-      } else {
-        resolve(dataUrl);
-      }
-    });
-  });
 }
 
 /**
@@ -187,7 +97,16 @@ export async function processRouteAddress(address, config = {}, progressCallback
           });
         }
       } catch (screenshotError) {
-        console.warn(`Screenshot failed for ${address.full}:`, screenshotError);
+        console.error(`Screenshot failed for ${address.full}:`, screenshotError);
+        // Notify user about screenshot failure
+        if (progressCallback) {
+          progressCallback({
+            type: 'screenshot_failed',
+            address: address.full,
+            error: screenshotError.message,
+            message: `⚠️ Screenshot failed: ${screenshotError.message}`
+          });
+        }
       }
 
       // Close tab
@@ -276,159 +195,15 @@ export async function processRouteAddress(address, config = {}, progressCallback
  * Process batch of addresses with concurrency control
  * @param {Array<Object>} addresses - Array of address objects
  * @param {Object} config - Configuration options
+/**
+ * Process batch of addresses with concurrency control
+ * @param {Array<Object>} addresses - Array of address objects
+ * @param {Object} config - Configuration options
  * @param {Function} progressCallback - Progress callback
  * @returns {Promise<Object>} Batch processing result
  */
 export async function processRouteBatch(addresses, config = {}, progressCallback = null) {
-  // Validate inputs
-  if (!Array.isArray(addresses) || addresses.length === 0) {
-    throw new Error('Addresses must be a non-empty array');
-  }
-
-  if (addresses.length > ROUTE_CONFIG.maxBatchSize) {
-    throw new Error(`Batch size exceeds maximum of ${ROUTE_CONFIG.maxBatchSize} addresses`);
-  }
-
-  const finalConfig = { ...ROUTE_CONFIG, ...config };
-  const batchId = generateBatchId();
-
-  // Initialize batch state
-  const batchState = {
-    id: batchId,
-    total: addresses.length,
-    processed: 0,
-    successful: 0,
-    failed: 0,
-    results: [],
-    startTime: Date.now(),
-    status: 'running',
-    config: finalConfig
-  };
-
-  activeBatches.set(batchId, batchState);
-
-  if (progressCallback) {
-    progressCallback({
-      type: 'batch_start',
-      batchId: batchId,
-      total: addresses.length,
-      message: `Starting batch ${batchId}: ${addresses.length} addresses`
-    });
-  }
-
-  try {
-    // Process with concurrency control
-    const maxConcurrent = finalConfig.maxConcurrentTabs;
-    const results = [];
-    let index = 0;
-
-    // Process in chunks
-    while (index < addresses.length) {
-      const chunk = addresses.slice(index, index + maxConcurrent);
-      index += chunk.length;
-
-      // Process chunk in parallel
-      const chunkPromises = chunk.map(async (address, chunkIndex) => {
-        const globalIndex = index - chunk.length + chunkIndex;
-
-        try {
-          const result = await processRouteAddress(address, finalConfig, (update) => {
-            // Update batch state
-            if (update.type === 'complete') {
-              batchState.successful++;
-            } else if (update.type === 'error') {
-              batchState.failed++;
-            }
-
-            batchState.processed++;
-
-            // Forward to progress callback
-            if (progressCallback) {
-              progressCallback({
-                ...update,
-                batchId: batchId,
-                current: batchState.processed,
-                total: batchState.total,
-                percent: Math.round((batchState.processed / batchState.total) * 100)
-              });
-            }
-          });
-
-          return result;
-
-        } catch (error) {
-          batchState.failed++;
-          batchState.processed++;
-
-          return {
-            success: false,
-            address: address.full,
-            error: error.message,
-            timestamp: new Date().toISOString()
-          };
-        }
-      });
-
-      // Wait for chunk to complete
-      const chunkResults = await Promise.all(chunkPromises);
-      results.push(...chunkResults);
-
-      // Delay between chunks
-      if (index < addresses.length) {
-        await sleep(finalConfig.tabOpenDelay);
-      }
-    }
-
-    // Finalize batch state
-    batchState.results = results;
-    batchState.status = 'complete';
-    batchState.endTime = Date.now();
-    batchState.duration = batchState.endTime - batchState.startTime;
-
-    const summary = {
-      total: results.length,
-      successful: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success).length,
-      duration: batchState.duration
-    };
-
-    if (progressCallback) {
-      progressCallback({
-        type: 'batch_complete',
-        batchId: batchId,
-        summary: summary,
-        results: results,
-        message: `Batch complete: ${summary.successful}/${summary.total} successful (${Math.round(summary.duration / 1000)}s)`
-      });
-    }
-
-    return {
-      batchId: batchId,
-      summary: summary,
-      results: results
-    };
-
-  } catch (error) {
-    batchState.status = 'error';
-    batchState.error = error.message;
-
-    if (progressCallback) {
-      progressCallback({
-        type: 'batch_error',
-        batchId: batchId,
-        error: error.message,
-        message: `❌ Batch error: ${error.message}`
-      });
-    }
-
-    throw error;
-
-  } finally {
-    // Keep batch state for a short time, then cleanup
-    setTimeout(() => {
-      activeBatches.delete(batchId);
-    }, 60000); // Keep for 1 minute
-  }
+  return processBatchInternal(addresses, config, progressCallback, processRouteAddress);
 }
 
 /**

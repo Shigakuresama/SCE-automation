@@ -5,6 +5,10 @@
 
 // Import address generator functions
 import { generateAddressRange } from './address-generator.js';
+import { downloadCanvassPDF } from './pdf-generator.js';
+import { parseSkipAddresses, showError, clearError, showStatusMessage, switchTab, sleep } from './route-planner-utils.js';
+import { updateProgress, updateAddressStatus, renderAddressList, resetUI, handleMapToggle } from './route-planner-ui.js';
+import { processAddressInTab, processBatch, processAddresses as processAddressesHandler } from './route-planner-handlers.js';
 
 // State management
 const state = {
@@ -82,6 +86,12 @@ function setupEventListeners() {
  */
 function loadSettings() {
   chrome.storage.sync.get('routePlanner', (result) => {
+    if (chrome.runtime.lastError) {
+      console.error('[Route Planner] Failed to load settings:', chrome.runtime.lastError);
+      showStatusMessage('⚠️ Could not load saved settings', 'warning');
+      return;
+    }
+
     if (result.routePlanner) {
       const settings = result.routePlanner;
 
@@ -104,7 +114,12 @@ function saveSettings() {
     side: elements.side.value
   };
 
-  chrome.storage.sync.set({ routePlanner: settings });
+  chrome.storage.sync.set({ routePlanner: settings }, () => {
+    if (chrome.runtime.lastError) {
+      console.error('[Route Planner] Failed to save settings:', chrome.runtime.lastError);
+      showStatusMessage('⚠️ Could not save settings', 'warning');
+    }
+  });
 }
 
 /**
@@ -137,17 +152,6 @@ function updateAddressCount() {
 /**
  * Parse skip addresses input
  */
-function parseSkipAddresses(skipValue) {
-  if (!skipValue || !skipValue.trim()) {
-    return [];
-  }
-  return skipValue.split(',')
-    .map(s => s.trim())
-    .filter(s => s.length > 0);
-}
-
-/**
- * Handle generate button click
  */
 async function handleGenerate() {
   if (state.isProcessing) {
@@ -181,14 +185,14 @@ async function handleGenerate() {
     elements.addressList.style.display = 'block';
 
     // Clear previous results
-    renderAddressList();
+    renderAddressList(state.addresses, elements.addressList);
 
     // Start processing
-    await processAddresses(addresses);
+    await processAddressesHandler(state, elements, addresses);
 
   } catch (error) {
     showStatusMessage(error.message, 'error');
-    resetUI();
+    resetUI(elements);
   }
 }
 
@@ -252,161 +256,7 @@ function generateAddresses() {
 /**
  * Process all addresses
  */
-async function processAddresses(addresses) {
-  const batchSize = 3;
-  state.totalBatches = Math.ceil(addresses.length / batchSize);
-  state.currentBatch = 0;
 
-  for (let i = 0; i < addresses.length; i += batchSize) {
-    if (!state.isProcessing) {
-      break; // Cancelled
-    }
-
-    const batch = addresses.slice(i, i + batchSize);
-    state.currentBatch = Math.floor(i / batchSize) + 1;
-
-    updateProgress(i, addresses.length);
-
-    // Process batch
-    await processBatch(batch);
-
-    // Small delay between batches
-    await sleep(500);
-  }
-
-  // Processing complete
-  if (state.isProcessing) {
-    updateProgress(addresses.length, addresses.length);
-    showStatusMessage(`✅ Processed ${state.processedAddresses.length} addresses`, 'success');
-    elements.pdfSection.style.display = 'block';
-  } else {
-    showStatusMessage('⏹️ Processing cancelled', 'error');
-  }
-
-  resetUI();
-}
-
-/**
- * Process a batch of addresses
- */
-async function processBatch(batch) {
-  for (const address of batch) {
-    if (!state.isProcessing) return;
-
-    // Update status to processing
-    updateAddressStatus(address.full, 'processing');
-
-    try {
-      // Send message to background script to open tab and fill form
-      const result = await processAddressInTab(address);
-
-      if (result.success) {
-        state.processedAddresses.push({
-          ...address,
-          ...result.capturedData,
-          status: 'complete'
-        });
-        updateAddressStatus(address.full, 'success', result.capturedData);
-      } else {
-        state.processedAddresses.push({
-          ...address,
-          status: 'error',
-          error: result.error
-        });
-        updateAddressStatus(address.full, 'error', null, result.error);
-      }
-
-    } catch (error) {
-      state.processedAddresses.push({
-        ...address,
-        status: 'error',
-        error: error.message
-      });
-      updateAddressStatus(address.full, 'error', null, error.message);
-    }
-  }
-}
-
-/**
- * Process a single address in a new tab
- */
-async function processAddressInTab(address) {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage({
-      action: 'processRouteAddress',
-      address: address
-    }, (response) => {
-      if (chrome.runtime.lastError) {
-        resolve({
-          success: false,
-          error: chrome.runtime.lastError.message
-        });
-      } else {
-        resolve(response || { success: false, error: 'No response' });
-      }
-    });
-  });
-}
-
-/**
- * Update progress display
- */
-function updateProgress(current, total) {
-  const percent = Math.round((current / total) * 100);
-  elements.progressText.textContent = `Processing: ${current}/${total}`;
-  elements.progressFill.style.width = `${percent}%`;
-}
-
-/**
- * Update address status in the list
- */
-function updateAddressStatus(address, status, customerData = null, error = null) {
-  const item = document.querySelector(`[data-address="${address}"]`);
-  if (!item) return;
-
-  const icon = item.querySelector('.status-icon');
-  const info = item.querySelector('.customer-info');
-
-  // Update icon
-  icon.className = `status-icon ${status}`;
-
-  if (status === 'processing') {
-    icon.innerHTML = '⏳';
-    info.textContent = 'Processing...';
-  } else if (status === 'success') {
-    icon.innerHTML = '✅';
-    if (customerData && customerData.name) {
-      info.textContent = `${customerData.name} - ${customerData.phone || 'No phone'}`;
-    } else {
-      info.textContent = 'No customer data captured';
-    }
-  } else if (status === 'error') {
-    icon.innerHTML = '❌';
-    info.textContent = error || 'Failed to process';
-  }
-}
-
-/**
- * Render the initial address list
- */
-function renderAddressList() {
-  elements.addressList.innerHTML = '';
-
-  state.addresses.forEach(address => {
-    const item = document.createElement('div');
-    item.className = 'address-item';
-    item.dataset.address = address.full;
-
-    item.innerHTML = `
-      <span class="status-icon pending">⏸️</span>
-      <div class="address-text">
-        <div>${address.full}</div>
-        <div class="customer-info">Pending</div>
-      </div>
-    `;
-
-    elements.addressList.appendChild(item);
-  });
 }
 
 /**
@@ -418,40 +268,28 @@ async function handleGeneratePDF() {
     return;
   }
 
+  const hasCustomerData = state.processedAddresses.some(addr => addr.name || addr.phone);
+  if (!hasCustomerData) {
+    showStatusMessage('⚠️ No customer data captured. PDF will have blank name/phone fields.', 'warning');
+  }
+
   elements.generatePdfBtn.disabled = true;
   elements.generatePdfBtn.textContent = 'Generating...';
 
   try {
-    // Send message to background script to generate PDF
-    chrome.runtime.sendMessage({
-      action: 'generateRoutePDF',
-      addresses: state.processedAddresses
-    }, (response) => {
-      if (chrome.runtime.lastError) {
-        showStatusMessage(`Error: ${chrome.runtime.lastError.message}`, 'error');
-      } else if (response && response.success) {
-        showStatusMessage('✅ PDF downloaded!', 'success');
-      } else {
-        showStatusMessage('Failed to generate PDF', 'error');
-      }
+    const street = state.processedAddresses[0]?.street || 'route';
+    const date = new Date().toISOString().split('T')[0];
+    const filename = street.replace(/\s+/g, '-') + '-' + date + '-canvass.pdf';
 
-      elements.generatePdfBtn.disabled = false;
-      elements.generatePdfBtn.textContent = 'Generate 3×3 Grid PDF';
-    });
-
+    await downloadCanvassPDF(state.processedAddresses, filename);
+    showStatusMessage('✅ PDF downloaded!', 'success');
   } catch (error) {
-    showStatusMessage(`Error: ${error.message}`, 'error');
+    console.error('[Route Planner] PDF generation error:', error);
+    showStatusMessage('Error: ' + error.message, 'error');
+  } finally {
     elements.generatePdfBtn.disabled = false;
     elements.generatePdfBtn.textContent = 'Generate 3×3 Grid PDF';
   }
-}
-
-/**
- * Handle map toggle
- */
-function handleMapToggle() {
-  // Future: Switch to map view
-  showStatusMessage('Map view coming soon!', 'success');
 }
 
 /**
@@ -460,111 +298,6 @@ function handleMapToggle() {
 function cancelProcessing() {
   state.isProcessing = false;
   showStatusMessage('Cancelling...', 'error');
-}
-
-/**
- * Reset UI to initial state
- */
-function resetUI() {
-  state.isProcessing = false;
-  elements.generateBtn.textContent = `Generate & Process ${state.addresses.length} Houses`;
-  elements.generateBtn.classList.remove('btn-secondary');
-  elements.generateBtn.classList.add('btn-primary');
-}
-
-/**
- * Switch between tabs
- */
-function switchTab(tabName) {
-  // Hide all tabs
-  document.querySelectorAll('.tab-content').forEach(tab => {
-    tab.classList.remove('active');
-  });
-
-  // Deactivate all buttons
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.remove('active');
-  });
-
-  // Show selected tab
-  const selectedTab = document.getElementById(`${tabName}-tab`);
-  if (selectedTab) {
-    selectedTab.classList.add('active');
-  }
-
-  // Activate button
-  const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
-  if (activeBtn) {
-    activeBtn.classList.add('active');
-  }
-}
-
-/**
- * Show error on input field
- */
-function showError(element, message) {
-  element.classList.add('error');
-  const errorDiv = document.getElementById(`${element.id}Error`);
-  if (errorDiv) {
-    errorDiv.textContent = message;
-    errorDiv.style.display = 'block';
-  }
-}
-
-/**
- * Clear error from input field
- */
-function clearError(element) {
-  element.classList.remove('error');
-  const errorDiv = document.getElementById(`${element.id}Error`);
-  if (errorDiv) {
-    errorDiv.textContent = '';
-    errorDiv.style.display = 'none';
-  }
-}
-
-/**
- * Show status message
- */
-function showStatusMessage(message, type) {
-  // Create status element if needed
-  let statusDiv = document.getElementById('routeStatus');
-  if (!statusDiv) {
-    statusDiv = document.createElement('div');
-    statusDiv.id = 'routeStatus';
-    statusDiv.className = 'status';
-    elements.addressList.parentNode.insertBefore(statusDiv, elements.addressList);
-  }
-
-  statusDiv.textContent = message;
-  statusDiv.className = `status ${type}`;
-
-  // Auto-hide after 3 seconds
-  setTimeout(() => {
-    statusDiv.className = 'status';
-  }, 3000);
-}
-
-/**
- * Sleep utility
- */
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * Debounce utility
- */
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
 }
 
 // Export for use in popup.js
