@@ -85,6 +85,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true, validation });
     return true;
   }
+
+  // Process single route address (from popup)
+  if (request.action === 'processRouteAddress') {
+    handleSingleRouteAddress(request.address)
+      .then(result => sendResponse({ success: true, ...result }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
 });
 
 /**
@@ -168,3 +176,93 @@ setInterval(() => {
     console.log(`[SCE Auto-Fill] Cleaned up ${cleaned} old batches`);
   }
 }, 5 * 60 * 1000); // Every 5 minutes
+
+// ============================================
+// SINGLE ADDRESS PROCESSING
+// ============================================
+
+/**
+ * Handle processing of a single route address from popup
+ * @param {Object} address - Address object { number, street, city, state, zip, full }
+ * @returns {Promise<Object>} Processing result
+ */
+async function handleSingleRouteAddress(address) {
+  try {
+    // Open new tab with SCE form
+    const tabId = await openTab('https://sce.dsmcentral.com/onsite/projects');
+
+    // Wait for tab to load
+    await sleep(3000);
+
+    // Send fill form message to content script
+    const fillResult = await sendToContentScript(tabId, {
+      action: 'fillForm',
+      address: address.full,
+      zipCode: address.zip
+    });
+
+    if (!fillResult || !fillResult.success) {
+      await closeTab(tabId);
+      return {
+        success: false,
+        capturedData: null,
+        error: fillResult?.error || 'Failed to fill form'
+      };
+    }
+
+    // Wait for data capture
+    await sleep(5000);
+
+    // Try to capture customer data from the page
+    const capturedData = await captureCustomerData(tabId, address);
+
+    // Close the tab
+    await closeTab(tabId);
+
+    return {
+      success: true,
+      capturedData: capturedData
+    };
+
+  } catch (error) {
+    console.error('[SCE Auto-Fill] Single address processing error:', error);
+    return {
+      success: false,
+      capturedData: null,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Capture customer data from a tab
+ * @param {number} tabId - Tab ID
+ * @param {Object} address - Address object
+ * @returns {Promise<Object>} Captured customer data
+ */
+async function captureCustomerData(tabId, address) {
+  try {
+    const response = await sendToContentScript(tabId, {
+      action: 'captureCustomerData',
+      address: address.full
+    });
+
+    if (response && response.success) {
+      return response.data;
+    }
+
+    return {
+      name: null,
+      phone: null,
+      qualified: false
+    };
+
+  } catch (error) {
+    console.warn('[SCE Auto-Fill] Could not capture customer data:', error);
+    return {
+      name: null,
+      phone: null,
+      qualified: false
+    };
+  }
+}

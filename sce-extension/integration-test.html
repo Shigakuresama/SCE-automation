@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCE Route Planner - Integration Tests</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+
+    .test-section {
+      margin-bottom: 32px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .test-section-header {
+      background: #f9f9f9;
+      padding: 16px;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .test-section-title {
+      font-weight: 600;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .test-section-content {
+      padding: 16px;
+    }
+
+    .test-controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #45a049;
+    }
+
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #e0e0e0;
+    }
+
+    .btn-danger {
+      background: #f44336;
+      color: white;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #da190b;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .input-group label {
+      font-size: 14px;
+      color: #555;
+      font-weight: 500;
+    }
+
+    .input-group input {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      width: 200px;
+    }
+
+    .test-results {
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 16px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .test-result {
+      padding: 12px;
+      margin-bottom: 8px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .test-result:last-child {
+      margin-bottom: 0;
+    }
+
+    .test-result.success {
+      background: #e8f5e9;
+      border: 1px solid #c8e6c9;
+      color: #2e7d32;
+    }
+
+    .test-result.error {
+      background: #ffebee;
+      border: 1px solid #ffcdd2;
+      color: #c62828;
+    }
+
+    .test-result.info {
+      background: #e3f2fd;
+      border: 1px solid #bbdefb;
+      color: #1976d2;
+    }
+
+    .test-result-header {
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .test-result-details {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-top: 4px;
+      padding-left: 24px;
+      white-space: pre-wrap;
+      font-family: 'Courier New', monospace;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-badge.pass {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .status-badge.fail {
+      background: #f44336;
+      color: white;
+    }
+
+    .status-badge.running {
+      background: #2196F3;
+      color: white;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .summary-card {
+      background: #f9f9f9;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .summary-card-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .summary-card-value {
+      font-size: 24px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4CAF50, #66BB6A);
+      transition: width 0.3s;
+      width: 0%;
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: auto;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 768px) {
+      .test-controls {
+        flex-direction: column;
+      }
+
+      .input-group {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .input-group input {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SCE Route Planner - Integration Tests</h1>
+    <p class="subtitle">Manual testing suite for Chrome extension functionality</p>
+
+    <!-- Summary Cards -->
+    <div class="summary">
+      <div class="summary-card">
+        <div class="summary-card-label">Tests Run</div>
+        <div class="summary-card-value" id="testsRun">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-label">Passed</div>
+        <div class="summary-card-value" style="color: #4CAF50;" id="testsPassed">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-label">Failed</div>
+        <div class="summary-card-value" style="color: #f44336;" id="testsFailed">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-label">Pass Rate</div>
+        <div class="summary-card-value" id="passRate">-</div>
+      </div>
+    </div>
+
+    <!-- Overall Progress -->
+    <div class="progress-bar">
+      <div class="progress-fill" id="overallProgress"></div>
+    </div>
+
+    <!-- UI Tests -->
+    <div class="test-section">
+      <div class="test-section-header">
+        <div class="test-section-title">
+          <span>1. UI & Navigation Tests</span>
+        </div>
+      </div>
+      <div class="test-section-content">
+        <div class="test-controls">
+          <button class="btn-primary" onclick="runUITests()">Run All UI Tests</button>
+          <button class="btn-secondary" onclick="testPopupTabs()">Test Tab Switching</button>
+          <button class="btn-secondary" onclick="testFormValidation()">Test Form Validation</button>
+          <button class="btn-secondary" onclick="testAddressCount()">Test Address Count</button>
+        </div>
+        <div class="test-results" id="uiResults"></div>
+      </div>
+    </div>
+
+    <!-- Address Generation Tests -->
+    <div class="test-section">
+      <div class="test-section-header">
+        <div class="test-section-title">
+          <span>2. Address Generation Tests</span>
+        </div>
+      </div>
+      <div class="test-section-content">
+        <div class="test-controls">
+          <button class="btn-primary" onclick="runAddressGenerationTests()">Run All Address Tests</button>
+          <button class="btn-secondary" onclick="testBasicRange()">Test Basic Range</button>
+          <button class="btn-secondary" onclick="testOddEvenFilter()">Test Odd/Even Filter</button>
+          <button class="btn-secondary" onclick="testSkipAddresses()">Test Skip Addresses</button>
+          <button class="btn-secondary" onclick="testAddressSwap()">Test Auto-Swap</button>
+        </div>
+        <div class="test-results" id="addressResults"></div>
+      </div>
+    </div>
+
+    <!-- PDF Generation Tests -->
+    <div class="test-section">
+      <div class="test-section-header">
+        <div class="test-section-title">
+          <span>3. PDF Generation Tests</span>
+        </div>
+      </div>
+      <div class="test-section-content">
+        <div class="test-controls">
+          <button class="btn-primary" onclick="runPDFTests()">Run All PDF Tests</button>
+          <button class="btn-secondary" onclick="testPDFLoad()">Test jsPDF Load</button>
+          <button class="btn-secondary" onclick="testPDFGeneration()">Test PDF Generation</button>
+          <button class="btn-secondary" onclick="testPDFDownload()">Test PDF Download</button>
+        </div>
+        <div class="test-results" id="pdfResults"></div>
+      </div>
+    </div>
+
+    <!-- Integration Tests -->
+    <div class="test-section">
+      <div class="test-section-header">
+        <div class="test-section-title">
+          <span>4. Full Integration Tests</span>
+        </div>
+      </div>
+      <div class="test-section-content">
+        <div class="test-controls">
+          <div class="input-group">
+            <label for="testStart">Start:</label>
+            <input type="text" id="testStart" value="1909 W Martha Ln">
+            <label for="testEnd">End:</label>
+            <input type="text" id="testEnd" value="1925 W Martha Ln">
+            <label for="testCity">City:</label>
+            <input type="text" id="testCity" value="Santa Ana">
+            <label for="testZIP">ZIP:</label>
+            <input type="text" id="testZIP" value="92706">
+          </div>
+        </div>
+        <div class="test-controls">
+          <button class="btn-primary" onclick="runFullIntegrationTest()">Run Full Integration Test</button>
+          <button class="btn-secondary" onclick="runSmallScaleTest()">Run Small Scale Test (3 addresses)</button>
+          <button class="btn-danger" onclick="clearTestResults()">Clear Results</button>
+        </div>
+        <div class="test-results" id="integrationResults"></div>
+      </div>
+    </div>
+
+    <!-- Test Configuration -->
+    <div class="test-section">
+      <div class="test-section-header">
+        <div class="test-section-title">
+          <span>5. Test Configuration</span>
+        </div>
+      </div>
+      <div class="test-section-content">
+        <div class="checkbox-group">
+          <div class="checkbox-item">
+            <input type="checkbox" id="stopOnFailure">
+            <label for="stopOnFailure">Stop on first failure</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="verboseLogging" checked>
+            <label for="verboseLogging">Verbose logging</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="includeSlowTests">
+            <label for="includeSlowTests">Include slow tests (requires network)</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="lib/jspdf.umd.min.js"></script>
+  <script type="module" src="integration-test.js"></script>
+</body>
+</html>

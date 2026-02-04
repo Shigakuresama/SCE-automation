@@ -761,10 +761,9 @@ function getNextSectionTitle() {
     const statusIndicator = item.querySelector('.sections-menu-item__status-indicator');
 
     // Skip sections that are already completed (check_circle icon)
-    const isCompleted = statusIndicator?.querySelector('mat-icon[fonticon="check_circle"], mat-icon:contains("check_circle")');
     const hasCheckIcon = statusIndicator?.textContent?.includes('check_circle');
 
-    if (!isCompleted && !hasCheckIcon) {
+    if (!hasCheckIcon) {
       const titleEl = item.querySelector('.sections-menu-item__title');
       return titleEl?.textContent?.trim() || '';
     }
