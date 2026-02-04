@@ -68,17 +68,27 @@ function setupEventListeners() {
   // Address input changes - update count
   const addressInputs = [elements.startAddress, elements.endAddress];
   addressInputs.forEach(input => {
-    input.addEventListener('input', debounce(updateAddressCount, 300));
+    if (input) {
+      input.addEventListener('input', debounce(updateAddressCount, 300));
+    }
   });
 
   // Generate button
-  elements.generateBtn.addEventListener('click', handleGenerate);
+  if (elements.generateBtn) {
+    elements.generateBtn.addEventListener('click', handleGenerate);
+  }
 
   // PDF button
-  elements.generatePdfBtn.addEventListener('click', handleGeneratePDF);
+  if (elements.generatePdfBtn) {
+    elements.generatePdfBtn.addEventListener('click', handleGeneratePDF);
+  }
 
   // Map toggle
-  elements.mapToggle.addEventListener('click', handleMapToggle);
+  if (elements.mapToggle) {
+    elements.mapToggle.addEventListener('click', handleMapToggle);
+  } else {
+    console.error('[Route Planner] mapToggle element not found');
+  }
 
   // Tab switching (if tab manager exists)
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -92,13 +102,20 @@ function setupEventListeners() {
  * Handle map toggle button click
  */
 function handleMapToggle() {
+  console.log('[Route Planner] Map toggle clicked');
+  console.log('[Route Planner] mapViewContainer:', elements.mapViewContainer);
+  console.log('[Route Planner] mapElement:', elements.mapElement);
+
   const mapContainer = elements.mapViewContainer;
   const mapElement = elements.mapElement;
 
   if (!mapContainer || !mapElement) {
+    console.error('[Route Planner] Map container not found', { mapContainer, mapElement });
     showStatusMessage('Map container not found', 'error');
     return;
   }
+
+  console.log('[Route Planner] Toggling map mode, current:', state.mapMode);
 
   // Toggle map mode
   state.mapMode = !state.mapMode;
@@ -112,24 +129,35 @@ function handleMapToggle() {
 
     // Initialize map if not already
     if (!state.mapView) {
-      state.mapView = new MapView(mapElement, {
-        onAddressSelect: (address) => {
-          if (state.mapViewUI) {
-            state.mapViewUI.onAddressSelect(address);
-          }
-        },
-        onMarkerRemove: (address) => {
-          if (state.mapViewUI) {
-            state.mapViewUI.onAddressRemove(address);
-          }
-        },
-      });
+      console.log('[Route Planner] Initializing MapView...');
+      try {
+        state.mapView = new MapView(mapElement, {
+          onAddressSelect: (address) => {
+            if (state.mapViewUI) {
+              state.mapViewUI.onAddressSelect(address);
+            }
+          },
+          onMarkerRemove: (address) => {
+            if (state.mapViewUI) {
+              state.mapViewUI.onAddressRemove(address);
+            }
+          },
+        });
 
-      state.mapViewUI = new MapViewUI(mapContainer, state.mapView, {
-        onAddressesChange: (addresses) => {
-          updateAddressCount();
-        },
-      });
+        state.mapViewUI = new MapViewUI(mapContainer, state.mapView, {
+          onAddressesChange: (addresses) => {
+            updateAddressCount();
+          },
+        });
+        console.log('[Route Planner] MapView initialized successfully');
+      } catch (error) {
+        console.error('[Route Planner] Failed to initialize MapView:', error);
+        showStatusMessage('Failed to load map: ' + error.message, 'error');
+        // Reset map mode
+        state.mapMode = false;
+        mapContainer.classList.add('hidden');
+        return;
+      }
     } else {
       state.mapViewUI.show();
     }
