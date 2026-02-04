@@ -111,7 +111,10 @@ export function switchTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(content => {
     content.style.display = 'none';
   });
-  document.getElementById(`${tabName}Content`)?.style.display = 'block';
+  const tabContent = document.getElementById(`${tabName}Content`);
+  if (tabContent) {
+    tabContent.style.display = 'block';
+  }
 
   // Initialize route planner when switching to it
   if (tabName === 'routePlanner') {
