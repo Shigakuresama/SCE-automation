@@ -6,9 +6,11 @@
 // Import address generator functions
 import { generateAddressRange } from './address-generator.js';
 import { downloadCanvassPDF } from './pdf-generator.js';
-import { parseSkipAddresses, showError, clearError, showStatusMessage, switchTab, sleep } from './route-planner-utils.js';
-import { updateProgress, updateAddressStatus, renderAddressList, resetUI, handleMapToggle } from './route-planner-ui.js';
+import { parseSkipAddresses, showError, clearError, showStatusMessage, switchTab, sleep, debounce } from './route-planner-utils.js';
+import { updateProgress, updateAddressStatus, renderAddressList, resetUI } from './route-planner-ui.js';
 import { processAddressInTab, processBatch, processAddresses as processAddressesHandler } from './route-planner-handlers.js';
+import { MapView } from './map-view.js';
+import { MapViewUI } from './map-view-ui.js';
 
 // State management
 const state = {
@@ -16,7 +18,10 @@ const state = {
   processedAddresses: [],
   isProcessing: false,
   currentBatch: 0,
-  totalBatches: 0
+  totalBatches: 0,
+  mapMode: false,        // whether using map view
+  mapView: null,         // MapView instance
+  mapViewUI: null,       // MapViewUI instance
 };
 
 // DOM elements cache
@@ -52,6 +57,8 @@ function cacheElements() {
   elements.pdfReadyText = document.getElementById('pdfReadyText');
   elements.generatePdfBtn = document.getElementById('generatePdfBtn');
   elements.mapToggle = document.getElementById('mapToggle');
+  elements.mapViewContainer = document.getElementById('mapViewContainer');
+  elements.mapElement = document.getElementById('map');
 }
 
 /**
@@ -79,6 +86,79 @@ function setupEventListeners() {
       switchTab(e.target.dataset.tab);
     });
   });
+}
+
+/**
+ * Handle map toggle button click
+ */
+function handleMapToggle() {
+  const mapContainer = elements.mapViewContainer;
+  const mapElement = elements.mapElement;
+
+  if (!mapContainer || !mapElement) {
+    showStatusMessage('Map container not found', 'error');
+    return;
+  }
+
+  // Toggle map mode
+  state.mapMode = !state.mapMode;
+
+  if (state.mapMode) {
+    // Show map, make end address optional
+    mapContainer.classList.remove('hidden');
+    elements.mapToggle.textContent = '📝 Use Address Range Instead';
+    elements.endAddress.placeholder = 'Optional: enter end address';
+    elements.generateBtn.textContent = 'Process Selected Addresses';
+
+    // Initialize map if not already
+    if (!state.mapView) {
+      state.mapView = new MapView(mapElement, {
+        onAddressSelect: (address) => {
+          if (state.mapViewUI) {
+            state.mapViewUI.onAddressSelect(address);
+          }
+        },
+        onMarkerRemove: (address) => {
+          if (state.mapViewUI) {
+            state.mapViewUI.onAddressRemove(address);
+          }
+        },
+      });
+
+      state.mapViewUI = new MapViewUI(mapContainer, state.mapView, {
+        onAddressesChange: (addresses) => {
+          updateAddressCount();
+        },
+      });
+    } else {
+      state.mapViewUI.show();
+    }
+
+  } else {
+    // Hide map, require end address again
+    mapContainer.classList.add('hidden');
+    elements.mapToggle.textContent = '🗺️ Use Map View - Click houses to add';
+    elements.endAddress.placeholder = '1925 W Martha Ln';
+    elements.generateBtn.textContent = 'Generate & Process X Houses';
+
+    if (state.mapViewUI) {
+      state.mapViewUI.hide();
+    }
+
+    // Cleanup map resources to prevent memory leaks
+    cleanupMap();
+  }
+}
+
+/**
+ * Cleanup map resources
+ */
+function cleanupMap() {
+  if (state.mapView) {
+    state.mapView.destroy();
+    state.mapView = null;
+  }
+  state.mapViewUI = null;
 }
 
 /**
@@ -127,6 +207,15 @@ function saveSettings() {
  */
 function updateAddressCount() {
   try {
+    // In map mode, show selected addresses count
+    if (state.mapMode && state.mapViewUI) {
+      const count = state.mapViewUI.getSelectedAddresses().length;
+      elements.addressCount.textContent = count;
+      clearError(elements.startAddress);
+      clearError(elements.endAddress);
+      return;
+    }
+
     const start = elements.startAddress.value.trim();
     const end = elements.endAddress.value.trim();
     const side = elements.side.value;
@@ -150,8 +239,7 @@ function updateAddressCount() {
 }
 
 /**
- * Parse skip addresses input
- */
+ * Handle generate button click
  */
 async function handleGenerate() {
   if (state.isProcessing) {
@@ -209,8 +297,9 @@ function validateInputs() {
     return { field: elements.startAddress, message: 'Enter a start address' };
   }
 
-  if (!end) {
-    return { field: elements.endAddress, message: 'Enter an end address' };
+  // Only require end address if NOT in map mode
+  if (!state.mapMode && !end) {
+    return { field: elements.endAddress, message: 'Enter an end address (or use map view)' };
   }
 
   if (!city) {
@@ -235,14 +324,25 @@ function generateAddresses() {
   const start = elements.startAddress.value.trim();
   const end = elements.endAddress.value.trim();
   const city = elements.city.value.trim();
-  const state = elements.state.value;
+  const stateValue = elements.state.value;
   const zip = elements.zip.value.trim();
   const side = elements.side.value;
   const skip = parseSkipAddresses(elements.skip.value);
 
+  // In map mode, use selected addresses from map
+  if (state.mapMode && state.mapViewUI) {
+    const mapAddresses = state.mapViewUI.getSelectedAddresses();
+
+    if (mapAddresses.length === 0) {
+      throw new Error('Click on the map to select at least one address');
+    }
+
+    return mapAddresses;
+  }
+
   // Build full addresses
-  const startFull = `${start}, ${city}, ${state} ${zip}`;
-  const endFull = `${end}, ${city}, ${state} ${zip}`;
+  const startFull = `${start}, ${city}, ${stateValue} ${zip}`;
+  const endFull = `${end}, ${city}, ${stateValue} ${zip}`;
 
   const addresses = generateAddressRange(startFull, endFull, { side, skip });
 
@@ -251,12 +351,6 @@ function generateAddresses() {
   }
 
   return addresses;
-}
-
-/**
- * Process all addresses
- */
-
 }
 
 /**
@@ -298,6 +392,15 @@ async function handleGeneratePDF() {
 function cancelProcessing() {
   state.isProcessing = false;
   showStatusMessage('Cancelling...', 'error');
+}
+
+// Global function for Leaflet popup buttons
+if (typeof globalThis !== 'undefined') {
+  globalThis.removeMapMarker = (index) => {
+    if (state.mapViewUI) {
+      state.mapViewUI.removeAddressAt(index);
+    }
+  };
 }
 
 // Export for use in popup.js

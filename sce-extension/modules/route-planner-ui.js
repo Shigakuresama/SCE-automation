@@ -127,9 +127,3 @@ export function resetUI(elements) {
   }
 }
 
-/**
- * Handle map toggle (placeholder for future implementation)
- */
-export function handleMapToggle() {
-  showStatusMessage('Map view coming soon!', 'success');
-}
