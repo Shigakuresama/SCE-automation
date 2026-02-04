@@ -3,9 +3,6 @@
  * Runs on SCE pages to detect forms and fill them
  */
 
-import { SectionLoader } from './modules/loader.js';
-import { showError, showWarning, showInfo } from './modules/error-banner.js';
-
 console.log('[SCE Auto-Fill] Content script loaded');
 
 // ============================================
@@ -16,7 +13,9 @@ let config = {
   address: '22216 Seine',
   zipCode: '90716',
 
-  // Customer Information
+  // Customer Information (HOMEOWNER fields - no longer used, homeowner info comes from SCE)
+  // NOTE: These config values are NOT used in Customer Information section anymore
+  // Customer Contact email is now generated from the homeowner's name on the SCE form
   firstName: 'Sergio',
   lastName: 'Correa',
   phone: '7143912727',
@@ -25,7 +24,7 @@ let config = {
   // Additional Customer Information
   title: 'Outreach',
   preferredContactTime: '1:00PM - 3:30PM',
-  language: 'English',
+  language: 'Spanish',
   ethnicity: 'Hispanic/Latino',
   householdUnits: '1',
   spaceOrUnit: '1',
@@ -45,7 +44,7 @@ let config = {
   nativeAmerican: 'No',
 
   // Enrollment Information
-  incomeVerificationType: 'PRISM code',
+  incomeVerificationType: 'PRIZM Code',
   plus4Zip: '',
 
   // Household Members
@@ -57,7 +56,7 @@ let config = {
   zillowYearBuilt: '',
   projectSpaceOrUnit: '1',
 
-  // Trade Ally Information
+  // Trade Ally Information (CONTRACTOR fields - Sergio's info, used in Trade Ally section)
   projectFirstName: 'Sergio',
   projectLastName: 'Correa',
   projectTitle: 'Outreach',
@@ -67,8 +66,6 @@ let config = {
   // Appointment Contact
   attempt1Date: '01/30/2026',
   attempt1Time: '2:00PM',
-  attempt2Date: '01/31/2026',
-  attempt2Time: '3:00PM',
 
   // Appointments
   contractorName: 'Sergio Correa',
@@ -587,8 +584,7 @@ async function selectDropdown(labelText, optionText) {
   const currentValueDiv = matSelect.querySelector('.mat-select-value-text');
   const currentValue = currentValueDiv?.textContent?.trim() || '';
   if (currentValue.toLowerCase() === optionText.toLowerCase() ||
-      currentValue === optionText ||
-      (formField.classList.contains('ng-touched') && formField.classList.contains('ng-dirty'))) {
+      currentValue === optionText) {
     log(`  ⊙ ${labelText}: already set to "${currentValue}"`);
     return true;
   }
@@ -1049,41 +1045,39 @@ async function fillCustomerInfo() {
     log('  ⚠️ Alternate Phone not found or empty');
   }
 
-  // Use config email if provided, otherwise generate from customer name
-  const emailToUse = config.email || '';
-  if (emailToUse) {
-    const emailInput = findInputByMatLabel('Contact Email');
-    if (emailInput) {
-      await setInputValue(emailInput, emailToUse, 'Contact Email');
-      log(`  ✓ Filled Contact Email: ${emailToUse}`);
-    }
-  } else if (customerName) {
+  // Generate email from customer name (homeowner, not contractor)
+  if (customerName) {
     const email = generateEmail(customerName);
     const emailInput = findInputByMatLabel('Contact Email');
     if (emailInput) {
       await setInputValue(emailInput, email, 'Contact Email');
-      log(`  ✓ Generated Contact Email: ${email}`);
+      log(`  ✓ Generated Contact Email from Customer Name: ${email}`);
     }
+  } else {
+    log('  ⚠️ Cannot generate email - no Customer Name found');
   }
 
-  // Fill Contact First/Last Name from config if available
-  if (config.firstName) {
-    const firstNameInput = findInputByMatLabel('Contact First Name');
-    if (firstNameInput) await setInputValue(firstNameInput, config.firstName, 'Contact First Name');
-  }
-  if (config.lastName) {
-    const lastNameInput = findInputByMatLabel('Contact Last Name');
-    if (lastNameInput) await setInputValue(lastNameInput, config.lastName, 'Contact Last Name');
-  }
+  // NOTE: Contact First/Last Name fields are left blank for the homeowner to fill
+  // or are pre-filled by SCE from the Customer Name field
+  // Trade Ally Information section contains contractor (Sergio's) contact info
 
   log('✅ Customer Information filled!');
 }
 
 function generateEmail(name) {
-  const patterns = [
+  // Gmail patterns (more common)
+  const gmailPatterns = [
     (f, l, d) => `${f.toLowerCase()}.${l.toLowerCase()}${d}@gmail.com`,
     (f, l, d) => `${l.toLowerCase()}.${f.toLowerCase()}${d}@gmail.com`,
     (f, l, d) => `${f.toLowerCase()}${l.toLowerCase()}${d}@gmail.com`,
+    (f, l, d) => `${f.toLowerCase()}.${l.toLowerCase()}${d}@gmail.com`,
+  ];
+
+  // Yahoo patterns (less common)
+  const yahooPatterns = [
+    (f, l, d) => `${f.toLowerCase()}${l.toLowerCase()}${d}@yahoo.com`,
+    (f, l, d) => `${f.toLowerCase()}_${l.toLowerCase()}${d}@yahoo.com`,
+    (f, l, d) => `${f.toLowerCase()}.${l.toLowerCase()}${d}@yahoo.com`,
   ];
 
   const parts = name.trim().split(/\s+/);
@@ -1091,7 +1085,12 @@ function generateEmail(name) {
   const last = parts.slice(1).join('') || 'name';
 
   const digits = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+
+  // 80% chance of Gmail, 20% chance of Yahoo
+  const useGmail = Math.random() < 0.8;
+  const patterns = useGmail ? gmailPatterns : yahooPatterns;
   const pattern = patterns[Math.floor(Math.random() * patterns.length)];
+
   return pattern(first, last, digits);
 }
 
@@ -1099,14 +1098,20 @@ async function fillAdditionalCustomerInfo() {
   log('📋 Filling Additional Customer Information (Phase 3)...');
   await sleep(1200);
 
+  // Get property data from proxy for Sq.Ft. and Year Built
+  const propertyData = await fetchPropertyDataFromProxy(
+    config.address,
+    config.zipCode
+  );
+
   const selections = {
     'How did you hear about the program?': config.howDidYouHear,
     'Preferred Contact Time': config.preferredContactTime,
     'Preferred Correspondence Language': config.language,
     'Household Spoken Language': config.language,
-    'Household Units': config.householdUnits,
+    'Household Units': '1',  // Always 1
     'Master Metered': config.masterMetered,
-    'Building Type': config.buildingType,
+    'Building Type': 'Residential Single Family',  // Always Residential Single Family
     'Homeowner or Renter/Tenant': 'Renter/Tenant',  // Always Renter/Tenant
     'Gas Provider': config.gasProvider,
     'Water Utility': config.waterUtility
@@ -1222,6 +1227,38 @@ async function fillAdditionalCustomerInfo() {
       const input = formField.querySelector('input');
       if (input) {
         await setInputValue(input, config.gasAccountNumber, 'Gas Account Number');
+      }
+    }
+  }
+
+  // ============================================
+  // ENERGY PROFILE INFORMATION (from proxy)
+  // ============================================
+
+  // Total Sq.Ft. - from proxy
+  const sqFtLabel = Array.from(document.querySelectorAll('mat-label'))
+    .find(l => l.textContent.includes('Total Sq') || l.textContent.includes('Total Sq.Ft.'));
+  if (sqFtLabel) {
+    const formField = sqFtLabel.closest('mat-form-field');
+    if (formField) {
+      const input = formField.querySelector('input');
+      if (input && !input.disabled) {
+        await setInputValue(input, propertyData.sqFt || '1200', 'Total Sq.Ft.', false);
+        log(`  ✓ Filled Total Sq.Ft.: ${propertyData.sqFt || '1200'}`);
+      }
+    }
+  }
+
+  // Year Built - from proxy
+  const yearLabel = Array.from(document.querySelectorAll('mat-label'))
+    .find(l => l.textContent.includes('Year Built'));
+  if (yearLabel) {
+    const formField = yearLabel.closest('mat-form-field');
+    if (formField) {
+      const input = formField.querySelector('input');
+      if (input && !input.disabled) {
+        await setInputValue(input, propertyData.yearBuilt || '1970', 'Year Built', false);
+        log(`  ✓ Filled Year Built: ${propertyData.yearBuilt || '1970'}`);
       }
     }
   }
@@ -1379,23 +1416,7 @@ async function fillAppointmentContact() {
   // Attempt 1 Time (dropdown)
   await selectDropdown('Attempt 1 Time', config.attempt1Time);
 
-  // Attempt 2 Date (if exists)
-  const date2Label = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Attempt 2 Date'));
-  if (date2Label) {
-    const formField = date2Label.closest('mat-form-field');
-    if (formField) {
-      const input = formField.querySelector('input');
-      if (input) {
-        await setInputValue(input, config.attempt2Date, 'Attempt 2 Date');
-      }
-    }
-  }
-
-  // Attempt 2 Time (dropdown)
-  const time2Label = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Attempt 2 Time'));
-  if (time2Label) {
-    await selectDropdown('Attempt 2 Time', config.attempt2Time);
-  }
+  // NOTE: Attempt 2 Date/Time removed - not filling these fields
 
   log('✅ Appointment Contact filled!');
 }
@@ -1404,92 +1425,167 @@ async function fillAppointmentContact() {
 // ASSESSMENT QUESTIONNAIRE (Phase 3)
 // ============================================
 async function fillAssessmentQuestionnaire() {
-  log('📋 Filling Assessment Questionnaire / Equipment Information...');
+  log('📋 Filling Assessment Questionnaire...');
   await sleep(2000);
   await waitForAngularStability(3000);
 
-  // Log all available labels on this page for debugging
-  const allLabels = Array.from(document.querySelectorAll('mat-label')).map(l => l.textContent.trim());
-  log(`  🔍 Found ${allLabels.length} labels on page`);
+  // ============================================
+  // HOME HEATING AND COOLING SYSTEM
+  // ============================================
+  log('  📋 Filling Home Heating and Cooling System...');
 
-  // Equipment fields from config
-  const equipmentFields = {
-    'Is the existing central heating system': config.hvacSystemType,
-    'Does the home have a Room air conditioner': config.hasRoomAC,
-    'Does the home have an evaporative cooler': config.hasEvapCooler,
-    'How many refrigerators': config.refrigeratorCount,
-    'Existing Refrigerator Equipment 1 Manufacturer Year': config.fridge1Year,
-    'Does the home have a stand-alone freezer': config.hasFreezer,
-    'What is the fuel type of the water heater': config.waterHeaterFuel,
-    'Water Heater Size': config.waterHeaterSize,
-    'Does the home have a dishwasher': config.hasDishwasher,
-    'Does the home have a clothes washer': config.hasClothesWasher,
-    'Does the home have a clothes dryer': config.hasClothesDryer
-  };
+  // 1. Does the home have a permanently installed central cooling system?
+  await sleep(500);
+  // For now, default to "No" if not in config
+  const hasCentralCooling = config.hasCentralAC || 'No';
+  await selectDropdown('Does the home have a permanently installed central cooling system', hasCentralCooling);
 
-  // Fill each equipment field if the label exists
-  for (const [label, value] of Object.entries(equipmentFields)) {
-    if (value) {
-      await sleep(400); // Increased for better Angular stability
-      const result = await selectDropdown(label, value);
-      if (!result) {
-        // Try as text input if dropdown fails
-        const labelEl = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes(label));
-        if (labelEl) {
-          const formField = labelEl.closest('mat-form-field');
-          if (formField) {
-            const input = formField.querySelector('input');
-            if (input) {
-              await setInputValue(input, value, label);
-            }
-          }
-        }
-      }
-    }
+  // 2. Does the home have a permanently installed central heating system?
+  await sleep(500);
+  await selectDropdown('Does the home have a permanently installed central heating system', 'Yes');
+  // Wait for secondary field to appear
+  await sleep(800);
+
+  // 3. Does the home have working Wi-Fi?
+  await sleep(500);
+  await selectDropdown('Does the home have working Wi-Fi', 'Yes');
+
+  // ============================================
+  // ROOM A/C
+  // ============================================
+  log('  📋 Filling Room A/C...');
+  await sleep(500);
+
+  // 4. Does the home have a Room A/C?
+  const roomACValue = config.hasRoomAC || 'Yes - Room AC';
+  // Convert to Yes/No
+  const roomACYesNo = roomACValue.includes('Yes') || roomACValue.includes('Room AC') ? 'Yes' : 'No';
+  const roomACResult = await selectDropdown('Does the home have a Room A/C', roomACYesNo);
+
+  // Wait for secondary field to appear if answered Yes
+  if (roomACResult && roomACYesNo === 'Yes') {
+    await sleep(800);
+    // 5. How many Room A/C units in working condition?
+    await selectDropdown('How many Room A/C units in working condition', config.refrigeratorCount || '1');
   }
 
-  // Fill Dryer Type separately (if clothes dryer was set)
-  if (config.hasClothesDryer && config.hasClothesDryer !== 'None') {
-    await sleep(400);
-    await selectDropdown('Dryer Type', config.clothesDryerType);
+  // ============================================
+  // PORTABLE AC
+  // ============================================
+  log('  📋 Filling Portable AC...');
+  await sleep(500);
+
+  // 6. Is there a portable AC in working condition?
+  const portableACResult = await selectDropdown('Is there a portable AC in working condition', 'No');
+
+  // If Yes, fill Portable AC Equipment
+  if (portableACResult) {
+    await sleep(800);
+    await selectDropdown('Portable AC Equipment', 'None');
   }
 
-  // Fill Equipment to be Installed (if configured)
-  if (config.equipmentToInstall && config.equipmentToInstall !== 'None') {
-    await sleep(400);
-    await selectDropdown('Equipment to be Installed', config.equipmentToInstall);
+  // ============================================
+  // EVAPORATIVE COOLER
+  // ============================================
+  log('  📋 Filling Evaporative Cooler...');
+  await sleep(500);
+
+  // 7. Does the home have an evaporative cooler?
+  const evapCoolerValue = config.hasEvapCooler || 'No';
+  const evapCoolerResult = await selectDropdown('Does the home have an evaporative cooler', evapCoolerValue);
+
+  // 8. Equipment to be Installed (after evaporative cooler)
+  if (evapCoolerResult) {
+    await sleep(800);
+    const equipmentValue = config.equipmentToInstall || 'None';
+    await selectDropdown('Equipment to be Installed', equipmentValue);
   }
 
-  // Fill Equipment Brand and Model if provided
-  if (config.equipmentBrand) {
-    await sleep(400);
-    const brandLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Brand') || l.textContent.includes('Manufacturer'));
-    if (brandLabel) {
-      const formField = brandLabel.closest('mat-form-field');
-      if (formField) {
-        const input = formField.querySelector('input');
-        if (input) {
-          await setInputValue(input, config.equipmentBrand, 'Equipment Brand');
-        }
-      }
-    }
+  // ============================================
+  // HOME APPLIANCES - REFRIGERATOR
+  // ============================================
+  log('  📋 Filling Refrigerator...');
+  await sleep(500);
+
+  // 9. Does the home have a refrigerator?
+  const fridgeResult = await selectDropdown('Does the home have a refrigerator', 'Yes');
+
+  // ============================================
+  // FREEZER
+  // ============================================
+  log('  📋 Filling Freezer...');
+  await sleep(500);
+
+  // 10. Does the home have a stand-alone freezer?
+  const freezerValue = config.hasFreezer || 'No';
+  const freezerResult = await selectDropdown('Does the home have a stand-alone freezer', freezerValue);
+
+  // If Yes, fill how many
+  if (freezerResult && freezerValue.includes('Yes')) {
+    await sleep(800);
+    await selectDropdown('How many stand-alone freezers in working condition', '1');
   }
 
-  if (config.equipmentModel) {
-    await sleep(400);
-    const modelLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Model'));
-    if (modelLabel) {
-      const formField = modelLabel.closest('mat-form-field');
-      if (formField) {
-        const input = formField.querySelector('input');
-        if (input) {
-          await setInputValue(input, config.equipmentModel, 'Equipment Model');
-        }
-      }
-    }
+  // ============================================
+  // DOMESTIC HOT WATER - WATER HEATER
+  // ============================================
+  log('  📋 Filling Water Heater...');
+  await sleep(500);
+
+  // 11. Does the home have a water heater in working condition?
+  await selectDropdown('Does the home have a water heater in working condition', 'Yes');
+
+  // ============================================
+  // HOME WATER SYSTEMS
+  // ============================================
+  log('  📋 Filling Home Water Systems...');
+
+  // 12. Does the home have a dishwasher?
+  const dishwasherValue = config.hasDishwasher || 'No';
+  await sleep(500);
+  await selectDropdown('Does the home have a dishwasher', dishwasherValue);
+
+  // 13. Does the home have a clothes washer?
+  const washerValue = config.hasClothesWasher || 'No';
+  await sleep(500);
+  const washerResult = await selectDropdown('Does the home have a clothes washer', washerValue);
+
+  // If Yes, fill working condition
+  if (washerResult && washerValue.includes('Yes')) {
+    await sleep(800);
+    await selectDropdown('Is the existing clothes washer in working condition', 'Yes');
   }
 
-  log('✅ Assessment Questionnaire / Equipment filled!');
+  // 14. Does the home have a clothes dryer?
+  const dryerValue = config.hasClothesDryer || 'No';
+  await sleep(500);
+  const dryerResult = await selectDropdown('Does the home have a clothes dryer', dryerValue);
+
+  // ============================================
+  // POOL PUMP
+  // ============================================
+  log('  📋 Filling Pool Pump...');
+  await sleep(500);
+
+  // 15. Does the residence have a private, in-ground pool filled with water?
+  const poolResult = await selectDropdown('Does the residence have a private, in-ground pool filled with water', 'No');
+
+  // If Yes, fill working condition
+  if (poolResult) {
+    await sleep(800);
+    await selectDropdown('Is the existing pump and filtration system in working condition', 'Yes');
+  }
+
+  // ============================================
+  // LIGHTING SYSTEMS - EXTERIOR LIGHT FIXTURES
+  // ============================================
+  log('  📋 Filling Lighting Systems...');
+  await sleep(500);
+
+  // 16. Does the customer control the exterior light fixtures?
+  await selectDropdown('Does the customer control the exterior light fixtures', 'No');
+
+  log('✅ Assessment Questionnaire filled!');
 }
 
 // ============================================
@@ -1519,29 +1615,20 @@ async function fillHouseholdMembers() {
   if (!firstName) firstName = config.firstName || 'John';
   if (!lastName) lastName = config.lastName || 'Correa';
 
-  // Step 1: Find and click the measure button (div.measure__btns mat-icon)
-  // Based on recording: xpath//html/body/app-root/app-layouts/div/div/section/div/app-estimated/div[1]/div[1]/app-estimated-measure/div/div/div[3]/div/button[2]/span/mat-icon
+  // Step 1: Find and click the "+" button in div.measure__btns
   const measureBtn = (() => {
-    // Try multiple approaches to find the measure add button
-    // Approach 1: Look in app-estimated-measure div, div[3]/div/button[2]
-    const measureContainer = document.querySelector('app-estimated-measure');
-    if (measureContainer) {
-      // Look for div with class containing "measure" and "btn"
-      const measureDivs = measureContainer.querySelectorAll('div[class*="measure"], div[class*="btn"]');
-      for (const div of measureDivs) {
-        const buttons = div.querySelectorAll('button');
-        if (buttons.length >= 2) {
-          // Second button is the add button
-          const icon = buttons[1].querySelector('mat-icon');
-          if (icon && icon.textContent.trim().toLowerCase() === 'add') {
-            log('  📍 Found measure add button via container');
-            return buttons[1];
-          }
-        }
+    // Look for div.measure__btns container
+    const measureBtnsDiv = document.querySelector('div.measure__btns');
+    if (measureBtnsDiv) {
+      // Find the button with mat-icon in it
+      const btn = measureBtnsDiv.querySelector('button');
+      if (btn) {
+        log('  📍 Found measure add button via measure__btns');
+        return btn;
       }
     }
 
-    // Approach 2: Look for any button with "add" icon in the page
+    // Fallback: Look for button with add icon
     const allButtons = Array.from(document.querySelectorAll('button'));
     for (const btn of allButtons) {
       const icon = btn.querySelector('mat-icon');
@@ -1560,50 +1647,54 @@ async function fillHouseholdMembers() {
 
   if (measureBtn) {
     measureBtn.click();
-    log('  ✓ Clicked Measure Add button');
+    log('  ✓ Clicked Measure Add (+) button');
     await sleep(1500);
   } else {
-    log('  ⚠️ Measure Add button not found - trying to find dialog directly');
-    // Try to proceed anyway - dialog might already be open
+    log('  ⚠️ Measure Add button not found - dialog might already be open');
   }
 
-  // Step 2: Click on a checkbox to select the measure (in dialog)
-  await sleep(500);
-  // Look for checkbox in the dialog overlay
-  const dialog = document.querySelector('div.cdk-overlay-container app-estimated-measure-products, app-estimated-measure-products');
-  if (dialog) {
-    log('  📍 Found products dialog');
-    // Find the first checkbox
-    const checkbox = dialog.querySelector('mat-checkbox');
-    if (checkbox) {
-      // Click on the label > div (as per recording)
-      const labelDiv = checkbox.querySelector('label > div');
-      if (labelDiv) {
-        labelDiv.click();
-        log('  ✓ Clicked measure checkbox');
-      } else {
-        // Fallback: click the checkbox label
-        const label = checkbox.querySelector('label');
-        if (label) label.click();
-        log('  ✓ Clicked measure checkbox (fallback)');
-      }
-      await sleep(500);
+  // Step 2: Click checkbox to select household member (in dialog)
+  await sleep(800);
+  const checkbox = Array.from(document.querySelectorAll('mat-checkbox')).find(cb => {
+    const label = cb.querySelector('label');
+    return label && (
+      label.textContent.includes('Household Member') ||
+      label.textContent.includes('measure')
+    );
+  });
+
+  if (checkbox) {
+    // Click on the label > div (as per Playwright recording)
+    const labelDiv = checkbox.querySelector('label > div');
+    if (labelDiv) {
+      labelDiv.click();
+      log('  ✓ Clicked household member checkbox');
+    } else {
+      // Fallback: click the checkbox label
+      const label = checkbox.querySelector('label');
+      if (label) label.click();
+      log('  ✓ Clicked checkbox (fallback)');
     }
+    await sleep(500);
+  } else {
+    log('  ⚠️ Household member checkbox not found');
   }
 
   // Step 3: Click "Add & Continue" button (in dialog)
   await sleep(500);
   const addContinueBtn = (() => {
-    // Look in the dialog first
-    if (dialog) {
-      const btn = dialog.querySelector('button');
-      if (btn && (btn.textContent.includes('Add & Continue') || btn.textContent.includes('Add and Continue'))) {
-        return btn;
-      }
+    // Look for button in overlay container
+    const overlayBtn = Array.from(document.querySelectorAll('div.cdk-overlay-container button'))
+      .find(btn => btn.textContent.includes('Add & Continue'));
+
+    if (overlayBtn) {
+      log('  📍 Found Add & Continue button in overlay');
+      return overlayBtn;
     }
+
     // Fallback: search globally
     const buttons = Array.from(document.querySelectorAll('button'));
-    return buttons.find(b => b.textContent.includes('Add & Continue') || b.textContent.includes('Add and Continue'));
+    return buttons.find(b => b.textContent.includes('Add & Continue'));
   })();
 
   if (addContinueBtn) {
@@ -1614,12 +1705,11 @@ async function fillHouseholdMembers() {
     log('  ⚠️ Add & Continue button not found');
   }
 
-  // Step 4: Fill Name of Household Member (use full name)
-  await sleep(500);
+  // Step 4: Fill Name of Household Member (use full name from customer)
+  await sleep(800);
   const fullName = `${firstName} ${lastName}`.trim();
   const nameLabel = Array.from(document.querySelectorAll('mat-label')).find(l =>
-    l.textContent.includes('Name of Household Member') ||
-    l.textContent.includes('Household Member Name')
+    l.textContent.includes('Name of Household Member')
   );
   if (nameLabel) {
     const formField = nameLabel.closest('mat-form-field');
@@ -1632,18 +1722,19 @@ async function fillHouseholdMembers() {
     }
   }
 
-  // Step 5: Select "Applicant" for Relation to Applicant
+  // Step 5: Select "Applicant" for Relation to Applicant (always)
   await sleep(500);
   const relationResult = await selectDropdown('Relation to Applicant', 'Applicant');
   if (relationResult) {
     log('  ✓ Selected Relation: Applicant');
+  } else {
+    log('  ⚠️ Failed to select Relation to Applicant');
   }
 
-  // Step 6: Fill Household Member Age (same as primary applicant)
+  // Step 6: Fill Household Member Age (from config)
   await sleep(500);
   const ageLabel = Array.from(document.querySelectorAll('mat-label')).find(l =>
-    l.textContent.includes('Household Member Age') ||
-    l.textContent.includes('Member Age')
+    l.textContent.includes('Household Member Age')
   );
   if (ageLabel) {
     const formField = ageLabel.closest('mat-form-field');
@@ -1666,11 +1757,21 @@ async function createAppointment() {
   log('📋 Creating new Appointment...');
   await sleep(1500);
 
-  // Click the "+" button to add new appointment
+  // Step 1: Click the "+" button (in measure__btns)
   const addBtn = (() => {
+    // Find the plus button in the measure buttons area
+    const measureBtns = document.querySelector('.measure__btns');
+    if (measureBtns) {
+      const iconBtn = measureBtns.querySelector('button mat-icon, button');
+      if (iconBtn) return iconBtn;
+    }
+
+    // Fallback: find any add icon button
     const iconMatches = Array.from(document.querySelectorAll('button mat-icon, mat-icon, i.material-icons'));
     const icon = iconMatches.find((el) => (el.textContent || '').trim().toLowerCase() === 'add');
     if (icon) return icon.closest('button') || icon;
+
+    // Fallback: find button with + text
     const textButton = Array.from(document.querySelectorAll('button')).find((btn) => {
       const text = btn.textContent.trim().toLowerCase();
       return text === 'add' || text.includes('add appointment') || text === '+';
@@ -1681,48 +1782,66 @@ async function createAppointment() {
   if (addBtn) {
     addBtn.click();
     log('  ✓ Clicked add appointment button');
-    await sleep(1000);
+    await sleep(1500); // Wait for dialog to load
   } else {
     log('  ⚠️ Add button not found');
     return false;
   }
 
-  // Select contractor from dropdown (search by typing)
+  // Step 2: Click the checkbox to select the appointment (in the dialog)
   await sleep(500);
-  const contractorLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Contractor'));
-  if (contractorLabel) {
-    const formField = contractorLabel.closest('mat-form-field');
-    if (formField) {
-      const matSelect = formField.querySelector('mat-select');
-      if (matSelect) {
-        matSelect.click();
-        await sleep(500);
-
-        // Type in search box
-        const searchInput = document.querySelector('input[aria-label="dropdown search"], input[placeholder*="search" i]');
-        if (searchInput) {
-          searchInput.value = config.contractorName.substring(0, 5);  // Type first 5 chars to search
-          searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-          searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-          await sleep(800);
-
-          // Select the first matching option
-          const options = Array.from(document.querySelectorAll('mat-option'));
-          const match = options.find(o => o.textContent && o.textContent.toLowerCase().includes(config.contractorName.toLowerCase()));
-          if (match) {
-            match.click();
-            log(`  ✓ Selected contractor: ${config.contractorName}`);
-          } else if (options.length > 0) {
-            options[0].click();
-            log(`  ✓ Selected first contractor option`);
-          }
-        }
-        await sleep(400);
-      }
+  const checkbox = Array.from(document.querySelectorAll('mat-checkbox')).find(cb => {
+    const label = cb.querySelector('label');
+    return label && label.textContent.includes('Appointment');
+  });
+  if (checkbox) {
+    const labelDiv = checkbox.querySelector('label > div');
+    if (labelDiv) {
+      labelDiv.click();
+      log('  ✓ Clicked appointment checkbox');
+      await sleep(500);
     }
   }
 
-  // Set Appointment Date (using date picker)
+  // Step 3: Click "Add & Continue" button in dialog
+  const addContinueBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+    const text = btn.textContent.trim();
+    return text.includes('Add & Continue');
+  });
+  if (addContinueBtn) {
+    addContinueBtn.click();
+    log('  ✓ Clicked Add & Continue');
+    await sleep(1000); // Wait for dialog to close and form to load
+  }
+
+  // Step 4: Select product (if dropdown appears)
+  await sleep(500);
+  const productSelect = document.querySelector('.cdk-overlay-container mat-select, .cdk-overlay-container [role="listbox"]');
+  if (productSelect) {
+    productSelect.click();
+    await sleep(500);
+
+    // Type in search box
+    const searchInput = document.querySelector('input[aria-label="dropdown search"], input[placeholder*="search" i]');
+    if (searchInput) {
+      // Type "Ser" to search for Service or similar
+      searchInput.value = 'Ser';
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+      await sleep(800);
+
+      // Select first matching option
+      const options = Array.from(document.querySelectorAll('mat-option'));
+      if (options.length > 0) {
+        options[0].click();
+        log(`  ✓ Selected product: ${options[0].textContent?.trim()}`);
+      }
+    }
+    await sleep(400);
+  }
+
+  // Step 5: Set Appointment Date to attempt1Date (using date picker)
+  await sleep(500);
   const dateLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Appointment Date'));
   if (dateLabel) {
     const formField = dateLabel.closest('mat-form-field');
@@ -1731,40 +1850,70 @@ async function createAppointment() {
       if (dateToggle) {
         dateToggle.click();
         await sleep(500);
+        log(`  📅 Setting date to: ${config.attempt1Date}`);
 
-        // Click today or first available day in calendar
-        const todayBtn = document.querySelector('mat-calendar-body td:not(.mat-calendar-body-disabled) div');
-        if (todayBtn) {
-          todayBtn.click();
-          log(`  ✓ Selected appointment date`);
+        // Parse attempt1Date (format: "01/30/2026")
+        const dateMatch = config.attempt1Date.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (dateMatch) {
+          const month = parseInt(dateMatch[1], 10);
+          const day = parseInt(dateMatch[2], 10);
+          const year = parseInt(dateMatch[3], 10);
+
+          // Navigate to the correct date if needed
+          const todayBtn = document.querySelector('mat-calendar-body td:not(.mat-calendar-body-disabled) div');
+          if (todayBtn) {
+            // Just click first available day for now
+            todayBtn.click();
+            log(`  ✓ Selected appointment date`);
+          }
+        } else {
+          // Fallback: click first available day
+          const todayBtn = document.querySelector('mat-calendar-body td:not(.mat-calendar-body-disabled) div');
+          if (todayBtn) {
+            todayBtn.click();
+            log(`  ✓ Selected first available date`);
+          }
         }
         await sleep(400);
       } else {
         // No date picker, try direct input
         const input = formField.querySelector('input');
-        if (input) {
+        if (input && !input.disabled) {
           await setInputValue(input, config.attempt1Date, 'Appointment Date');
         }
       }
     }
   }
 
-  // Set Appointment Status to "Scheduled"
-  await selectDropdown('Appointment Status', config.appointmentStatus);
+  // Step 6: Set Appointment Status to "Scheduled"
+  await selectDropdown('Appointment Status', 'Scheduled');
 
-  // Set Appointment Type (may already be set, but try to set it)
-  await selectDropdown('Appointment Type', config.appointmentType);
+  // Step 7: Set Appointment Type to "On-Site Appointment"
+  await selectDropdown('Appointment Type', 'On-Site Appointment');
 
-  // Set Start Time
+  // Step 8: Set Start Time to attempt1Time
   await selectDropdown('Start Time', config.attempt1Time);
 
-  // Set End Time (use config if provided, else +1 hour)
-  const endTime = config.appointmentEndTime
-    || (globalThis.SCEAutoFillUtils?.addHoursToTime
-      ? globalThis.SCEAutoFillUtils.addHoursToTime(config.attempt1Time, 1)
-      : config.attempt2Time);
+  // Step 9: Set End Time (+1 hour from Attempt 1)
+  const endTime = globalThis.SCEAutoFillUtils?.addHoursToTime
+    ? globalThis.SCEAutoFillUtils.addHoursToTime(config.attempt1Time, 1)
+    : null;
   if (endTime) {
     await selectDropdown('End Time', endTime);
+  }
+
+  // Step 10: Set Assigned Personnel (from Trade Ally name)
+  const assignedLabel = Array.from(document.querySelectorAll('mat-label')).find(l => l.textContent.includes('Assigned Personnel'));
+  if (assignedLabel) {
+    const formField = assignedLabel.closest('mat-form-field');
+    if (formField) {
+      const input = formField.querySelector('input');
+      if (input && !input.disabled) {
+        const fullName = `${config.projectFirstName} ${config.projectLastName}`.trim();
+        await setInputValue(input, fullName, 'Assigned Personnel');
+        log(`  ✓ Set Assigned Personnel: ${fullName}`);
+      }
+    }
   }
 
   log('✅ Appointment created!');
@@ -1793,13 +1942,18 @@ async function fillEnrollmentInformation() {
     }
   }
 
-  // Select "PRISM code" for Income Verification Type (always)
+  // Select "PRIZM Code" for Income Verification Type (always)
+  // Note: The option is "PRIZM Code" (capital I, Z), not "PRISM code"
   await sleep(500);
-  const result = await selectDropdown('Income Verification Type', 'PRISM code');
-  if (result) {
-    log('  ✓ Selected PRISM code for Income Verification Type');
+  const result = await selectDropdown('Income Verification Type', 'PRIZM Code');
+  if (!result) {
+    // Fallback to trying "PRISM code" in case they change the spelling
+    await selectDropdown('Income Verification Type', 'PRISM code');
   }
-  await sleep(800);
+  if (result) {
+    log('  ✓ Selected PRIZM Code for Income Verification Type');
+  }
+  await sleep(1000); // Wait longer for Angular to update DOM
 
   // Get Plus 4 from:
   // 1. Global variable (extracted from Mailing Zip on Customer Info page)
@@ -1834,13 +1988,24 @@ async function fillEnrollmentInformation() {
 
   if (plus4Zip) {
     log(`  📋 Filling Plus 4 zip: ${plus4Zip}`);
-    // Find and fill "Enter Plus 4" field
-    const plus4Label = Array.from(document.querySelectorAll('mat-label')).find(l =>
-      l.textContent.includes('Plus 4') ||
-      l.textContent.includes('Enter Plus') ||
-      l.textContent.includes('Plus-4') ||
-      l.textContent.includes('Plus 4')
-    );
+
+    // Wait for the Plus 4 field to appear (it appears after PRIZM Code selection)
+    // Wait up to 3 seconds for the field to appear
+    let plus4Label = null;
+    for (let i = 0; i < 6; i++) {
+      await sleep(500);
+      plus4Label = Array.from(document.querySelectorAll('mat-label')).find(l =>
+        l.textContent.includes('Plus 4') ||
+        l.textContent.includes('Enter Plus') ||
+        l.textContent.includes('Plus-4') ||
+        l.textContent.includes('e.g., 1111')
+      );
+      if (plus4Label) {
+        log(`  ✓ Found Plus 4 field after ${i * 500}ms`);
+        break;
+      }
+    }
+
     if (plus4Label) {
       const formField = plus4Label.closest('mat-form-field');
       if (formField) {
@@ -1852,7 +2017,7 @@ async function fillEnrollmentInformation() {
         }
       }
     } else {
-      log('  ⚠️ Plus 4 field label not found');
+      log('  ⚠️ Plus 4 field label not found (may not be visible yet)');
     }
 
     // Click the sync save button (mat-icon="backup")
@@ -1883,24 +2048,58 @@ async function fillSummaryInfo() {
   // Wait for Angular stability
   await waitForAngularStability(2000);
 
-  // Fill the appointment date (from config.attempt1Date)
-  if (config.attempt1Date) {
-    // Look for date field with calendar icon
-    const dateLabels = Array.from(document.querySelectorAll('mat-label'));
-    const dateLabel = dateLabels.find(l => l.textContent.includes('Date') && !l.textContent.includes('Income'));
+  // ============================================
+  // ASSESSMENT INFORMATION - All dropdowns get "Yes"
+  // ============================================
+  log('  📋 Filling Assessment Information dropdowns...');
 
-    if (dateLabel) {
-      const formField = dateLabel.closest('mat-form-field');
+  // 1. Energy Education Enrollment - always "Yes"
+  await sleep(300);
+  const result1 = await selectDropdown('Energy Education Enrollment', 'Yes');
+  if (result1) {
+    log('  ✓ Energy Education Enrollment: Yes');
+  }
+
+  // 2. My Account Enrolled - always "Yes"
+  await sleep(300);
+  const result2 = await selectDropdown('My Account Enrolled', 'Yes');
+  if (result2) {
+    log('  ✓ My Account Enrolled: Yes');
+  }
+
+  // ============================================
+  // OWNERS AUTHORIZATION INFORMATION
+  // ============================================
+  log('  📋 Filling Owners Authorization Information...');
+
+  // 3. Did you receive the signed POA? - always "Yes"
+  await sleep(300);
+  const result3 = await selectDropdown('Did you receive the signed POA', 'Yes');
+  if (result3) {
+    log('  ✓ Did you receive the signed POA: Yes');
+  }
+
+  // 4. Owners Authorization Signature Date - use appointment date (attempt1Date)
+  if (config.attempt1Date) {
+    await sleep(500);
+
+    // Find the specific date field by label
+    const dateLabels = Array.from(document.querySelectorAll('mat-label'));
+    const signatureDateLabel = dateLabels.find(l =>
+      l.textContent.includes('Owners Authorization Signature Date')
+    );
+
+    if (signatureDateLabel) {
+      const formField = signatureDateLabel.closest('mat-form-field');
       if (formField) {
         // Try clicking the date picker toggle
-        const dateToggle = formField.querySelector('mat-datepicker-toggle button, button[aria-label*="Open calendar" i], button[aria-label*="calendar" i]');
+        const dateToggle = formField.querySelector('mat-datepicker-toggle button');
         if (dateToggle) {
           dateToggle.click();
-          log('  ✓ Opened date picker');
+          log('  ✓ Opened Owners Authorization Signature Date picker');
           await sleep(500);
 
-          // Try to find and click the specific date from config
-          // Parse the attempt1Date (format: MM/DD/YYYY or similar)
+          // Parse the attempt1Date (format: MM/DD/YYYY)
           const dateParts = config.attempt1Date.split('/');
           const targetDay = parseInt(dateParts[1] || '01', 10);
 
@@ -1915,41 +2114,54 @@ async function fillSummaryInfo() {
 
             if (targetDayEl) {
               targetDayEl.click();
-              log(`  ✓ Selected date: ${config.attempt1Date}`);
+              log(`  ✓ Selected Owners Authorization Signature Date: ${config.attempt1Date}`);
             } else {
               // Click the first available day as fallback
               calendarDays[0].click();
-              log(`  ✓ Selected first available day`);
+              log(`  ✓ Selected first available day for signature date`);
             }
           } else {
             // Fallback: type the date directly
             const input = formField.querySelector('input');
             if (input) {
-              await setInputValue(input, config.attempt1Date, 'Date');
+              await setInputValue(input, config.attempt1Date, 'Owners Authorization Signature Date');
+              log(`  ✓ Set Owners Authorization Signature Date: ${config.attempt1Date}`);
             }
           }
           await sleep(400);
         } else {
-          // No date picker, try direct input
+          // No date picker toggle, try direct input
           const input = formField.querySelector('input');
           if (input) {
-            await setInputValue(input, config.attempt1Date, 'Date');
+            await setInputValue(input, config.attempt1Date, 'Owners Authorization Signature Date');
+            log(`  ✓ Set Owners Authorization Signature Date: ${config.attempt1Date}`);
           }
         }
       }
     }
   }
 
-  // Fill Electronic Acceptance Terms (from config)
+  // ============================================
+  // TERMS AND CONDITIONS - use config values
+  // ============================================
+  log('  📋 Filling Terms and Conditions...');
+
+  // Terms and Conditions Submission Method (from config)
   await sleep(300);
   if (config.electronicAcceptance) {
-    await selectDropdown('Electronic Acceptance Terms', config.electronicAcceptance);
+    const termsResult = await selectDropdown('Terms and Conditions Submission Method', config.electronicAcceptance);
+    if (termsResult) {
+      log(`  ✓ Terms and Conditions Submission Method: ${config.electronicAcceptance}`);
+    }
   }
 
-  // Fill "Did you receive incentive..." (from config)
+  // Did you receive incentive/prior incentive (from config)
   await sleep(300);
   if (config.priorIncentive) {
-    await selectDropdown('Did you receive', config.priorIncentive);
+    const priorResult = await selectDropdown('Did you receive', config.priorIncentive);
+    if (priorResult) {
+      log(`  ✓ Prior Incentive: ${config.priorIncentive}`);
+    }
   }
 
   log('✅ Summary Info filled!');
@@ -2007,7 +2219,7 @@ async function clickNext(expectedPageKey) {
   log(`➡️ Next → ${expectedPageKey}`);
 
   // Certain pages are NOT in the sidebar and must be reached via Next button
-  const nonSidebarPages = ['measure-info', 'summary-info', 'application-status'];
+  const nonSidebarPages = ['application-status'];
 
   const sectionTitle = keyToSectionTitle(expectedPageKey) || expectedPageKey;
   const availableSections = getAvailableSectionTitles();
@@ -2132,10 +2344,11 @@ async function runFillCurrentSectionOnly(banner) {
     { key: 'customer-information', name: 'Customer Information', action: fillCustomerInfo },
     { key: 'additional-customer-info', name: 'Additional Customer Information', action: fillAdditionalCustomerInfo },
     { key: 'enrollment-information', name: 'Enrollment Information', action: fillEnrollmentInformation },
+    { key: 'household-members', name: 'Household Members', action: fillHouseholdMembers },
     { key: 'project-information', name: 'Project Information', action: fillProjectInformation },
     { key: 'trade-ally-information', name: 'Trade Ally Information', action: fillTradeAllyInformation },
     { key: 'appointment-contact', name: 'Appointment Contact', action: fillAppointmentContact },
-    { key: 'appointments', name: 'Appointments', action: fillCustomFieldsOnly },
+    { key: 'appointments', name: 'Appointments', action: createAppointment },
     { key: 'assessment-questionnaire', name: 'Assessment Questionnaire', action: fillAssessmentQuestionnaire },
     { key: 'equipment-information', name: 'Equipment Information', action: fillCustomFieldsOnly },
     { key: 'basic-enrollment-equipment', name: 'Basic Enrollment Equipment', action: fillCustomFieldsOnly },
@@ -2143,8 +2356,6 @@ async function runFillCurrentSectionOnly(banner) {
     { key: 'review-terms', name: 'Review Terms and Conditions', action: fillCustomFieldsOnly },
     { key: 'file-uploads', name: 'File Uploads', action: fillCustomFieldsOnly },
     { key: 'review-comments', name: 'Review Comments', action: fillCustomFieldsOnly },
-    { key: 'measure-info', name: 'Measure Info', action: fillMeasureInfoPhase },
-    { key: 'summary-info', name: 'Summary Info', action: fillSummaryInfo },
     { key: 'application-status', name: 'Application Status', action: acceptLead }
   ];
 
@@ -2210,16 +2421,17 @@ async function runFillForm() {
   await loadConfig();
 
   // Complete workflow: go through ALL sections in order
-  // Section order in sidebar (may vary by program):
+  // Section order in sidebar (as they appear in the UI):
   const workflow = [
     { key: 'customer-search', name: 'Customer Search', action: fillCustomerSearch },
     { key: 'customer-information', name: 'Customer Information', action: fillCustomerInfo },
     { key: 'additional-customer-info', name: 'Additional Customer Information', action: fillAdditionalCustomerInfo },
     { key: 'enrollment-information', name: 'Enrollment Information', action: fillEnrollmentInformation },
+    { key: 'household-members', name: 'Household Members', action: fillHouseholdMembers },
     { key: 'project-information', name: 'Project Information', action: fillProjectInformation },
     { key: 'trade-ally-information', name: 'Trade Ally Information', action: fillTradeAllyInformation },
     { key: 'appointment-contact', name: 'Appointment Contact', action: fillAppointmentContact },
-    { key: 'appointments', name: 'Appointments', action: fillCustomFieldsOnly },
+    { key: 'appointments', name: 'Appointments', action: createAppointment },
     { key: 'assessment-questionnaire', name: 'Assessment Questionnaire', action: fillAssessmentQuestionnaire },
     { key: 'equipment-information', name: 'Equipment Information', action: fillCustomFieldsOnly },
     { key: 'basic-enrollment-equipment', name: 'Basic Enrollment Equipment', action: fillCustomFieldsOnly },
@@ -2227,8 +2439,6 @@ async function runFillForm() {
     { key: 'review-terms', name: 'Review Terms and Conditions', action: fillCustomFieldsOnly },
     { key: 'file-uploads', name: 'File Uploads', action: fillCustomFieldsOnly },
     { key: 'review-comments', name: 'Review Comments', action: fillCustomFieldsOnly },
-    { key: 'measure-info', name: 'Measure Info', action: fillMeasureInfoPhase },
-    { key: 'summary-info', name: 'Summary Info', action: fillSummaryInfo },
     { key: 'application-status', name: 'Application Status', action: acceptLead }
   ];
 
@@ -2263,8 +2473,8 @@ async function runFillForm() {
         checkStopped();
       } else if (step.key === 'customer-search') {
         log(`  ✓ Starting fresh from Customer Search`);
-      } else if (step.key === 'measure-info' || step.key === 'summary-info' || step.key === 'application-status') {
-        // These are non-sidebar pages, use Next button to reach them
+      } else if (step.key === 'application-status') {
+        // Application Status is reached via Next button
         const nextBtn = findNextButton();
         if (nextBtn) {
           nextBtn.click();
@@ -2287,10 +2497,6 @@ async function runFillForm() {
       if (step.action === fillCustomFieldsOnly) {
         const sectionTitle = keyToSectionTitle(step.key) || step.name;
         await fillCustomFieldsForSection(sectionTitle);
-      } else if (step.action === fillMeasureInfoPhase) {
-        // Measure Info: fill household members and create appointment
-        await fillHouseholdMembers();
-        await createAppointment();
       } else {
         await step.action();
       }
@@ -2342,18 +2548,6 @@ async function runFillForm() {
 // Helper for sections that only need custom field filling
 async function fillCustomFieldsOnly() {
   // This is handled in the main workflow
-}
-
-// Helper for Measure Info phase (Household Members + Appointment)
-async function fillMeasureInfoPhase() {
-  log('📋 Filling Measure Info (Household Members + Appointment)...');
-  await sleep(1500);
-  await waitForAngularStability(2000);
-
-  await fillHouseholdMembers();
-  await createAppointment();
-
-  log('✅ Measure Info filled!');
 }
 
 // ============================================
@@ -2559,8 +2753,8 @@ function initOnPageLoad() {
 
   // Show banner on form pages
   if (['customer-search', 'customer-information', 'additional-customer-info', 'enrollment-information',
-       'project-information', 'trade-ally-information', 'appointment-contact', 'assessment-questionnaire',
-       'measure-info', 'summary-info', 'application-status'].includes(page)) {
+       'household-members', 'project-information', 'trade-ally-information', 'appointment-contact',
+       'assessment-questionnaire', 'application-status'].includes(page)) {
     if (config.autoFillPrompt) {
       setTimeout(showBanner, 1500);
     }
