@@ -166,22 +166,27 @@ The Route Planner is a Chrome Extension utility for block canvassing automation:
 - `sce-extension/popup.js` - Tab switching and UI interactions
 - `sce-extension/lib/jspdf.umd.min.js` - PDF generation library
 - `sce-extension/modules/address-generator.js` - Address range generation logic
+- `sce-extension/modules/map-view.js` - Interactive map selection (Leaflet.js)
 
 **Features:**
 - Generate sequential addresses from a range (e.g., 1909-1925 W Martha Ln)
+- **NEW: Map View Mode** - Click houses on an interactive map to select addresses
 - Batch process addresses through SCE forms (3 at a time)
 - Capture customer name/phone from Application Status page
 - Generate 3x3 grid PDF with fillable fields for canvassing
 
 **Usage:**
 1. Open extension popup → "Route Planner" tab
-2. Enter address range (start/end address, city, state, ZIP)
-3. Click "Generate & Process X Houses"
+2. Choose mode:
+   - **Address Range Mode**: Enter address range (start/end address, city, state, ZIP)
+   - **Map View Mode**: Click "🗺️ Use Map View" button, then click houses on the map
+3. Click "Generate & Process X Houses" (or "Process X Houses" in map mode)
 4. Extension opens tabs, fills forms, captures data
 5. Click "Generate 3x3 Grid PDF" when complete
 6. Print PDF for door-to-door canvassing
 
 **See Also:** `/home/sergio/Projects/SCE-route-planner/ROUTE_PLANNER.md` for complete documentation
+**See Also:** `sce-extension/docs/MAP_VIEW.md` for Map View feature documentation
 
 ## Key Implementation Details
 
