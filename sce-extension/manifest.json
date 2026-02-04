@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SCE Form Auto-Fill",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Automatically fill SCE Rebate Center forms",
   "permissions": [
     "storage",
