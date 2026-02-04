@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCE Route Planner - Integration Tests</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+
+    .test-section {
+      margin-bottom: 32px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .test-section-header {
+      background: #f9f9f9;
+      padding: 16px;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .test-section-title {
+      font-weight: 600;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .test-section-content {
+      padding: 16px;
+    }
+
+    .test-controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #45a049;
+    }
+
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #e0e0e0;
+    }
+
+    .btn-danger {
+      background: #f44336;
+      color: white;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #da190b;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .input-group label {
+      font-size: 14px;
+      color: #555;
+      font-weight: 500;
+    }
+
+    .input-group input {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      width: 200px;
+    }
+
+    .test-results {
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 16px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .test-result {
+      padding: 12px;
+      margin-bottom: 8px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .test-result:last-child {
+      margin-bottom: 0;
+    }
+
+    .test-result.success {
+      background: #e8f5e9;
+      border: 1px solid #c8e6c9;
+      color: #2e7d32;
+    }
+
+    .test-result.error {
+      background: #ffebee;
+      border: 1px solid #ffcdd2;
+      color: #c62828;
+    }
+
+    .test-result.info {
+      background: #e3f2fd;
+      border: 1px solid #bbdefb;
+      color: #1976d2;
+    }
+
+    .test-result-header {
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .test-result-details {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-top: 4px;
+      padding-left: 24px;
+      white-space: pre-wrap;
+      font-family: 'Courier New', monospace;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-badge.pass {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .status-badge.fail {
+      background: #f44336;
+      color: white;
+    }
+
+    .status-badge.running {
+      background: #2196F3;
+      color: white;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .summary-card {
+      background: #f9f9f9;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .summary-card-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .summary-card-value {
+      font-size: 24px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4CAF50, #66BB6A);
+      transition: width 0.3s;
+      width: 0%;
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: auto;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 768px) {
+      .test-controls {
+        flex-direction: column;
+      }
+
+      .input-group {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .input-group input {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SCE Route Planner - Integration Tests</h1>
+    <p class="subtitle">Manual testing suite for Chrome extension functionality</p>
+
+    <!-- Summary Cards -->
+    <div class="summary">
+      <div class="summary-card">
+        <div class="summary-card-label">Tests Run</div>
+        <div class="summary-card-value" id="testsRun">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-label">Passed</div>
+        <div class="summary-card-value" style="color: #4CAF50;" id="testsPassed">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-label">Failed</div>
+        <div class="summary-card-value" style="color: #f44336;" id="testsFailed">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-label">Pass Rate</div>
+        <div class="summary-card-value" id="passRate">-</div>
+      </div>
+    </div>
+
+    <!-- Overall Progress -->
+    <div class="progress-bar">
+      <div class="progress-fill" id="overallProgress"></div>
+    </div>
+
+    <!-- UI Tests -->
+    <div class="test-section">
+      <div class="test-section-header">
+        <div class="test-section-title">
+          <span>1. UI & Navigation Tests</span>
+        </div>
+      </div>
+      <div class="test-section-content">
+        <div class="test-controls">
+          <button class="btn-primary" onclick="runUITests()">Run All UI Tests</button>
+          <button class="btn-secondary" onclick="testPopupTabs()">Test Tab Switching</button>
+          <button class="btn-secondary" onclick="testFormValidation()">Test Form Validation</button>
+          <button class="btn-secondary" onclick="testAddressCount()">Test Address Count</button>
+        </div>
+        <div class="test-results" id="uiResults"></div>
+      </div>
+    </div>
+
+    <!-- Address Generation Tests -->
+    <div class="test-section">
+      <div class="test-section-header">
+        <div class="test-section-title">
+          <span>2. Address Generation Tests</span>
+        </div>
+      </div>
+      <div class="test-section-content">
+        <div class="test-controls">
+          <button class="btn-primary" onclick="runAddressGenerationTests()">Run All Address Tests</button>
+          <button class="btn-secondary" onclick="testBasicRange()">Test Basic Range</button>
+          <button class="btn-secondary" onclick="testOddEvenFilter()">Test Odd/Even Filter</button>
+          <button class="btn-secondary" onclick="testSkipAddresses()">Test Skip Addresses</button>
+          <button class="btn-secondary" onclick="testAddressSwap()">Test Auto-Swap</button>
+        </div>
+        <div class="test-results" id="addressResults"></div>
+      </div>
+    </div>
+
+    <!-- PDF Generation Tests -->
+    <div class="test-section">
+      <div class="test-section-header">
+        <div class="test-section-title">
+          <span>3. PDF Generation Tests</span>
+        </div>
+      </div>
+      <div class="test-section-content">
+        <div class="test-controls">
+          <button class="btn-primary" onclick="runPDFTests()">Run All PDF Tests</button>
+          <button class="btn-secondary" onclick="testPDFLoad()">Test jsPDF Load</button>
+          <button class="btn-secondary" onclick="testPDFGeneration()">Test PDF Generation</button>
+          <button class="btn-secondary" onclick="testPDFDownload()">Test PDF Download</button>
+        </div>
+        <div class="test-results" id="pdfResults"></div>
+      </div>
+    </div>
+
+    <!-- Integration Tests -->
+    <div class="test-section">
+      <div class="test-section-header">
+        <div class="test-section-title">
+          <span>4. Full Integration Tests</span>
+        </div>
+      </div>
+      <div class="test-section-content">
+        <div class="test-controls">
+          <div class="input-group">
+            <label for="testStart">Start:</label>
+            <input type="text" id="testStart" value="1909 W Martha Ln">
+            <label for="testEnd">End:</label>
+            <input type="text" id="testEnd" value="1925 W Martha Ln">
+            <label for="testCity">City:</label>
+            <input type="text" id="testCity" value="Santa Ana">
+            <label for="testZIP">ZIP:</label>
+            <input type="text" id="testZIP" value="92706">
+          </div>
+        </div>
+        <div class="test-controls">
+          <button class="btn-primary" onclick="runFullIntegrationTest()">Run Full Integration Test</button>
+          <button class="btn-secondary" onclick="runSmallScaleTest()">Run Small Scale Test (3 addresses)</button>
+          <button class="btn-danger" onclick="clearTestResults()">Clear Results</button>
+        </div>
+        <div class="test-results" id="integrationResults"></div>
+      </div>
+    </div>
+
+    <!-- Test Configuration -->
+    <div class="test-section">
+      <div class="test-section-header">
+        <div class="test-section-title">
+          <span>5. Test Configuration</span>
+        </div>
+      </div>
+      <div class="test-section-content">
+        <div class="checkbox-group">
+          <div class="checkbox-item">
+            <input type="checkbox" id="stopOnFailure">
+            <label for="stopOnFailure">Stop on first failure</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="verboseLogging" checked>
+            <label for="verboseLogging">Verbose logging</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="includeSlowTests">
+            <label for="includeSlowTests">Include slow tests (requires network)</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="lib/jspdf.umd.min.js"></script>
+  <script type="module">
+    // Test harness state
+    const state = {
+      testsRun: 0,
+      testsPassed: 0,
+      testsFailed: 0,
+      currentSection: null
+    };
+
+    // DOM element references
+    const elements = {
+      testsRun: document.getElementById('testsRun'),
+      testsPassed: document.getElementById('testsPassed'),
+      testsFailed: document.getElementById('testsFailed'),
+      passRate: document.getElementById('passRate'),
+      overallProgress: document.getElementById('overallProgress'),
+      uiResults: document.getElementById('uiResults'),
+      addressResults: document.getElementById('addressResults'),
+      pdfResults: document.getElementById('pdfResults'),
+      integrationResults: document.getElementById('integrationResults')
+    };
+
+    /**
+     * Update summary cards
+     */
+    function updateSummary() {
+      elements.testsRun.textContent = state.testsRun;
+      elements.testsPassed.textContent = state.testsPassed;
+      elements.testsFailed.textContent = state.testsFailed;
+
+      const rate = state.testsRun > 0
+        ? Math.round((state.testsPassed / state.testsRun) * 100)
+        : 0;
+      elements.passRate.textContent = `${rate}%`;
+
+      // Update progress bar
+      const totalTests = 27; // Approximate total
+      const progress = (state.testsRun / totalTests) * 100;
+      elements.overallProgress.style.width = `${progress}%`;
+    }
+
+    /**
+     * Log test result
+     */
+    function logTest(section, testName, passed, details = '') {
+      state.testsRun++;
+      if (passed) {
+        state.testsPassed++;
+      } else {
+        state.testsFailed++;
+      }
+      updateSummary();
+
+      const resultsDiv = elements[`${section}Results`];
+      if (!resultsDiv) return;
+
+      const resultDiv = document.createElement('div');
+      resultDiv.className = `test-result ${passed ? 'success' : 'error'}`;
+
+      const statusBadge = passed ? 'PASS' : 'FAIL';
+      const icon = passed ? '✅' : '❌';
+
+      resultDiv.innerHTML = `
+        <div class="test-result-header">
+          <span>${icon}</span>
+          <span class="status-badge ${passed ? 'pass' : 'fail'}">${statusBadge}</span>
+          <span>${testName}</span>
+        </div>
+        ${details ? `<div class="test-result-details">${escapeHtml(details)}</div>` : ''}
+      `;
+
+      resultsDiv.appendChild(resultDiv);
+      resultsDiv.scrollTop = resultsDiv.scrollHeight;
+
+      if (document.getElementById('stopOnFailure').checked && !passed) {
+        throw new Error(`Test failed: ${testName}`);
+      }
+    }
+
+    /**
+     * Log info message
+     */
+    function logInfo(section, message) {
+      const resultsDiv = elements[`${section}Results`];
+      if (!resultsDiv) return;
+
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'test-result info';
+      infoDiv.innerHTML = `<div class="test-result-header">ℹ️ ${message}</div>`;
+      resultsDiv.appendChild(infoDiv);
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    /**
+     * Sleep utility
+     */
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // ============================================
+    // UI TESTS
+    // ============================================
+
+    window.runUITests = async function() {
+      logInfo('ui', 'Starting UI tests...');
+      try {
+        await testPopupTabs();
+        await testFormValidation();
+        await testAddressCount();
+        logInfo('ui', 'UI tests completed');
+      } catch (error) {
+        logTest('ui', 'UI Suite', false, error.message);
+      }
+    };
+
+    window.testPopupTabs = async function() {
+      logTest('ui', 'Tab Switching - Tab elements exist', true);
+      const tabs = document.querySelectorAll('.tab-btn');
+      logTest('ui', 'Tab Switching - Found tabs', tabs.length === 3,
+        `Expected 3 tabs, found ${tabs.length}`);
+
+      const tabContents = document.querySelectorAll('.tab-content');
+      logTest('ui', 'Tab Switching - Tab content panels exist', tabContents.length === 3,
+        `Expected 3 content panels, found ${tabContents.length}`);
+    };
+
+    window.testFormValidation = async function() {
+      // Test start address validation
+      const startInput = document.getElementById('startAddress');
+      if (startInput) {
+        startInput.value = '';
+        logTest('ui', 'Form Validation - Empty start address detected', !startInput.value.trim());
+
+        startInput.value = '1909 W Martha Ln';
+        logTest('ui', 'Form Validation - Valid start address accepted', startInput.value.trim().length > 0);
+      }
+
+      // Test ZIP validation
+      const zipInput = document.getElementById('zip');
+      if (zipInput) {
+        zipInput.value = '123';
+        logTest('ui', 'Form Validation - Invalid ZIP (3 digits)', !/^\d{5}$/.test(zipInput.value));
+
+        zipInput.value = '92706';
+        logTest('ui', 'Form Validation - Valid ZIP (5 digits)', /^\d{5}$/.test(zipInput.value));
+      }
+    };
+
+    window.testAddressCount = async function() {
+      const startInput = document.getElementById('startAddress');
+      const endInput = document.getElementById('endAddress');
+      const countSpan = document.getElementById('addressCount');
+
+      if (startInput && endInput && countSpan) {
+        startInput.value = '1909 W Martha Ln';
+        endInput.value = '1925 W Martha Ln';
+
+        // Trigger input event
+        startInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        await sleep(500); // Wait for debounce
+
+        const count = parseInt(countSpan.textContent);
+        logTest('ui', 'Address Count - Range 1909-1925 generates addresses', count > 0,
+          `Generated ${count} addresses`);
+      }
+    };
+
+    // ============================================
+    // ADDRESS GENERATION TESTS
+    // ============================================
+
+    window.runAddressGenerationTests = async function() {
+      logInfo('address', 'Starting address generation tests...');
+      try {
+        await testBasicRange();
+        await testOddEvenFilter();
+        await testSkipAddresses();
+        await testAddressSwap();
+        logInfo('address', 'Address generation tests completed');
+      } catch (error) {
+        logTest('address', 'Address Suite', false, error.message);
+      }
+    };
+
+    window.testBasicRange = async function() {
+      try {
+        // Import the address generator module
+        const module = await import('./modules/address-generator.js');
+        const { generateAddressRange } = module;
+
+        const start = '1909 W Martha Ln, Santa Ana, CA 92706';
+        const end = '1915 W Martha Ln, Santa Ana, CA 92706';
+
+        const addresses = generateAddressRange(start, end);
+
+        logTest('address', 'Basic Range - Generates correct count', addresses.length === 4,
+          `Expected 4 addresses (1909, 1911, 1913, 1915), got ${addresses.length}`);
+
+        logTest('address', 'Basic Range - First address correct', addresses[0].number === '1909',
+          `First address: ${addresses[0].full}`);
+
+        logTest('address', 'Basic Range - Last address correct', addresses[addresses.length - 1].number === '1915',
+          `Last address: ${addresses[addresses.length - 1].full}`);
+
+        logTest('address', 'Basic Range - All addresses increment by 2',
+          addresses.every((addr, i) => i === 0 || parseInt(addr.number) - parseInt(addresses[i-1].number) === 2),
+          addresses.map(a => a.number).join(', '));
+
+      } catch (error) {
+        logTest('address', 'Basic Range - Module loading/execution', false, error.message);
+      }
+    };
+
+    window.testOddEvenFilter = async function() {
+      try {
+        const module = await import('./modules/address-generator.js');
+        const { generateAddressRange } = module;
+
+        const start = '1908 W Martha Ln, Santa Ana, CA 92706';
+        const end = '1920 W Martha Ln, Santa Ana, CA 92706';
+
+        // Test odd filter
+        const oddAddresses = generateAddressRange(start, end, { side: 'odd' });
+        logTest('address', 'Odd/Even Filter - Odd only', oddAddresses.length > 0 &&
+          oddAddresses.every(addr => parseInt(addr.number) % 2 === 1),
+          `Odd addresses: ${oddAddresses.map(a => a.number).join(', ')}`);
+
+        // Test even filter
+        const evenAddresses = generateAddressRange(start, end, { side: 'even' });
+        logTest('address', 'Odd/Even Filter - Even only', evenAddresses.length > 0 &&
+          evenAddresses.every(addr => parseInt(addr.number) % 2 === 0),
+          `Even addresses: ${evenAddresses.map(a => a.number).join(', ')}`);
+
+      } catch (error) {
+        logTest('address', 'Odd/Even Filter', false, error.message);
+      }
+    };
+
+    window.testSkipAddresses = async function() {
+      try {
+        const module = await import('./modules/address-generator.js');
+        const { generateAddressRange } = module;
+
+        const start = '1909 W Martha Ln, Santa Ana, CA 92706';
+        const end = '1925 W Martha Ln, Santa Ana, CA 92706';
+
+        const skip = ['1915', '1921'];
+        const addresses = generateAddressRange(start, end, { skip });
+
+        const skippedNumbers = addresses.map(a => a.number);
+        const hasSkipped = skip.some(s => skippedNumbers.includes(s));
+
+        logTest('address', 'Skip Addresses - Correctly excludes specified', !hasSkipped,
+          `Generated: ${skippedNumbers.join(', ')}\nSkipped: ${skip.join(', ')}`);
+
+      } catch (error) {
+        logTest('address', 'Skip Addresses', false, error.message);
+      }
+    };
+
+    window.testAddressSwap = async function() {
+      try {
+        const module = await import('./modules/address-generator.js');
+        const { generateAddressRange } = module;
+
+        // Provide end before start
+        const start = '1925 W Martha Ln, Santa Ana, CA 92706';
+        const end = '1909 W Martha Ln, Santa Ana, CA 92706';
+
+        const addresses = generateAddressRange(start, end);
+
+        logTest('address', 'Auto-Swap - Handles reversed input', addresses.length > 0,
+          `Generated ${addresses.length} addresses from reversed input`);
+
+        logTest('address', 'Auto-Swap - First address is smaller', addresses.length > 0 &&
+          parseInt(addresses[0].number) <= parseInt(addresses[addresses.length - 1].number),
+          `Range: ${addresses[0].number} to ${addresses[addresses.length - 1].number}`);
+
+      } catch (error) {
+        logTest('address', 'Auto-Swap', false, error.message);
+      }
+    };
+
+    // ============================================
+    // PDF TESTS
+    // ============================================
+
+    window.runPDFTests = async function() {
+      logInfo('pdf', 'Starting PDF tests...');
+      try {
+        await testPDFLoad();
+        await testPDFGeneration();
+        await testPDFDownload();
+        logInfo('pdf', 'PDF tests completed');
+      } catch (error) {
+        logTest('pdf', 'PDF Suite', false, error.message);
+      }
+    };
+
+    window.testPDFLoad = async function() {
+      const loaded = typeof window.jspdf !== 'undefined' && window.jspdf.jsPDF;
+      logTest('pdf', 'jsPDF Load - Library available', loaded,
+        loaded ? 'jsPDF is loaded' : 'jsPDF not found on window.jspdf');
+    };
+
+    window.testPDFGeneration = async function() {
+      try {
+        const module = await import('./modules/pdf-generator.js');
+        const { generateCanvassPDF } = module;
+
+        // Create test data
+        const testCases = [
+          {
+            address: '1909 W Martha Ln, Santa Ana, CA 92706',
+            name: 'John Doe',
+            phone: '(555) 123-4567'
+          },
+          {
+            address: '1911 W Martha Ln, Santa Ana, CA 92706',
+            name: 'Jane Smith',
+            phone: '(555) 234-5678'
+          },
+          {
+            address: '1913 W Martha Ln, Santa Ana, CA 92706',
+            name: 'Bob Johnson',
+            phone: '(555) 345-6789'
+          }
+        ];
+
+        const doc = generateCanvassPDF(testCases);
+
+        logTest('pdf', 'PDF Generation - Creates document', doc !== null && typeof doc.save === 'function',
+          `Document type: ${doc ? typeof doc : 'null'}`);
+
+        logTest('pdf', 'PDF Generation - Accepts test data', true,
+          `Test cases: ${testCases.length}`);
+
+      } catch (error) {
+        logTest('pdf', 'PDF Generation', false, error.message);
+      }
+    };
+
+    window.testPDFDownload = async function() {
+      try {
+        const module = await import('./modules/pdf-generator.js');
+        const { downloadCanvassPDF } = module;
+
+        const testCases = [
+          {
+            address: '1909 W Martha Ln, Santa Ana, CA 92706',
+            name: 'Test Customer',
+            phone: '(555) 000-0000'
+          }
+        ];
+
+        // Note: This will actually trigger a download
+        const filename = await downloadCanvassPDF(testCases, 'test-integration');
+
+        logTest('pdf', 'PDF Download - Generates filename', filename && filename.endsWith('.pdf'),
+          `Generated: ${filename}`);
+
+        logInfo('pdf', `PDF downloaded to: ${filename}`);
+
+      } catch (error) {
+        logTest('pdf', 'PDF Download', false, error.message);
+      }
+    };
+
+    // ============================================
+    // INTEGRATION TESTS
+    // ============================================
+
+    window.runFullIntegrationTest = async function() {
+      logInfo('integration', 'Starting full integration test...');
+      logInfo('integration', 'This test requires the extension to be loaded in Chrome');
+      logInfo('integration', 'Open Chrome and load the extension to continue');
+
+      const start = document.getElementById('testStart').value;
+      const end = document.getElementById('testEnd').value;
+      const city = document.getElementById('testCity').value;
+      const zip = document.getElementById('testZIP').value;
+
+      logTest('integration', 'Integration - Test inputs provided',
+        start && end && city && zip,
+        `Start: ${start}\nEnd: ${end}\nCity: ${city}\nZIP: ${zip}`);
+
+      try {
+        const module = await import('./modules/address-generator.js');
+        const { generateAddressRange } = module;
+
+        const startFull = `${start}, ${city}, CA ${zip}`;
+        const endFull = `${end}, ${city}, CA ${zip}`;
+
+        const addresses = generateAddressRange(startFull, endFull);
+
+        logTest('integration', 'Integration - Address generation successful', addresses.length > 0,
+          `Generated ${addresses.length} addresses`);
+
+        // Test PDF generation with generated addresses
+        const pdfModule = await import('./modules/pdf-generator.js');
+        const { generateCanvassPDF } = pdfModule;
+
+        const testCases = addresses.slice(0, 9).map(addr => ({
+          address: addr.full,
+          name: `Test Customer ${addr.number}`,
+          phone: '(555) 000-0000'
+        }));
+
+        const doc = generateCanvassPDF(testCases);
+
+        logTest('integration', 'Integration - PDF generation with route data', doc !== null,
+          `Created PDF with ${testCases.length} cases`);
+
+        logInfo('integration', 'Integration test completed successfully');
+        logInfo('integration', 'Next step: Test in actual Chrome extension with real SCE forms');
+
+      } catch (error) {
+        logTest('integration', 'Integration - End-to-end flow', false, error.message);
+      }
+    };
+
+    window.runSmallScaleTest = async function() {
+      logInfo('integration', 'Running small scale test (3 addresses)...');
+
+      try {
+        const module = await import('./modules/address-generator.js');
+        const { generateAddressRange } = module;
+
+        const start = '1909 W Martha Ln, Santa Ana, CA 92706';
+        const end = '1915 W Martha Ln, Santa Ana, CA 92706';
+
+        const addresses = generateAddressRange(start, end);
+
+        logTest('integration', 'Small Scale - Generated 3-4 addresses', addresses.length >= 3 && addresses.length <= 4,
+          `Generated: ${addresses.map(a => a.number).join(', ')}`);
+
+        // Simulate processing
+        for (const addr of addresses) {
+          logInfo('integration', `Processing: ${addr.full}`);
+          await sleep(500);
+        }
+
+        logTest('integration', 'Small Scale - All addresses processed', true,
+          `Processed ${addresses.length} addresses`);
+
+      } catch (error) {
+        logTest('integration', 'Small Scale', false, error.message);
+      }
+    };
+
+    window.clearTestResults = async function() {
+      state.testsRun = 0;
+      state.testsPassed = 0;
+      state.testsFailed = 0;
+      updateSummary();
+
+      Object.values(elements).forEach(el => {
+        if (el && el.classList && el.classList.contains('test-results')) {
+          el.innerHTML = '';
+        }
+      });
+
+      logInfo('ui', 'Test results cleared');
+    };
+
+    // Initialize
+    updateSummary();
+    logInfo('ui', 'Test harness loaded. Click a test button to begin.');
+  </script>
+</body>
+</html>

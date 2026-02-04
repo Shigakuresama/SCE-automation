@@ -142,7 +142,9 @@ function stopFormFilling() {
     banner.querySelector('.sce-banner-text').textContent = '⏹️ Stopped';
 
     // Show error banner with message
-    showError('Process Stopped', 'Form filling was stopped by the user');
+    if (typeof globalThis.showError === 'function') {
+      globalThis.showError('Process Stopped', 'Form filling was stopped by the user');
+    }
   }
 
   // Hide stop button
@@ -327,7 +329,9 @@ async function checkProxyStatus(force = false) {
     return proxyAvailable;
   } catch (err) {
     log(`  ⚠️ Proxy health check failed: ${err.name} - ${err.message}`);
-    showWarning(`Proxy server health check failed: ${err.name}`);
+    if (typeof globalThis.showWarning === 'function') {
+      globalThis.showWarning(`Proxy server health check failed: ${err.name}`);
+    }
     proxyAvailable = false;
     return false;
   }
@@ -388,7 +392,9 @@ async function fetchPropertyDataFromProxy(address, zipCode) {
       return zillowData;
     } else {
       log(`  ⚠️ Proxy returned ${response.status} - using config values`);
-      showWarning(`Property data unavailable (HTTP ${response.status}). Using configured values.`);
+      if (typeof globalThis.showWarning === 'function') {
+        globalThis.showWarning(`Property data unavailable (HTTP ${response.status}). Using configured values.`);
+      }
     }
   } catch (err) {
     log(`  ⚠️ Proxy fetch failed: ${err.message}`);
@@ -408,7 +414,9 @@ async function fetchPropertyDataFromProxy(address, zipCode) {
       details = 'The scraping service is taking too long. Try again in a moment.';
     }
 
-    showError(userMessage, details);
+    if (typeof globalThis.showError === 'function') {
+      globalThis.showError(userMessage, details);
+    }
   }
 
   // Fallback to config values
@@ -680,12 +688,16 @@ function parseCustomFieldMap() {
     // Reject arrays explicitly (typeof array === 'object' is true)
     if (Array.isArray(data)) {
       log(`  ⚠️ Custom field map must be an object, not an array`);
-      showWarning('Custom Field Map must be an object, not an array. Using default fields.');
+      if (typeof globalThis.showWarning === 'function') {
+        globalThis.showWarning('Custom Field Map must be an object, not an array. Using default fields.');
+      }
       return {};
     }
     // Reject non-objects
     if (!data || typeof data !== 'object') {
-      showWarning('Custom Field Map must be a valid object. Using default fields.');
+      if (typeof globalThis.showWarning === 'function') {
+        globalThis.showWarning('Custom Field Map must be a valid object. Using default fields.');
+      }
       return {};
     }
     // Protect against prototype pollution - create safe object
@@ -700,7 +712,9 @@ function parseCustomFieldMap() {
     return safe;
   } catch (err) {
     log(`  ⚠️ Invalid custom field map JSON: ${err.message}`);
-    showWarning(`Invalid Custom Field Map: ${err.message}. Using default fields.`);
+    if (typeof globalThis.showWarning === 'function') {
+      globalThis.showWarning(`Invalid Custom Field Map: ${err.message}. Using default fields.`);
+    }
     return {};
   }
 }
@@ -2168,10 +2182,156 @@ async function fillSummaryInfo() {
 }
 
 // ============================================
+// DATA CAPTURE - CUSTOMER INFO FROM APPLICATION STATUS
+// ============================================
+/**
+ * Capture customer data from Application Status page
+ * @returns {Object|null} Customer data object or null if not found
+ */
+function captureCustomerData() {
+  log('  🔍 Capturing customer data from Application Status page...');
+
+  try {
+    // Extract case ID from URL
+    const url = new URL(window.location.href);
+    const caseId = url.searchParams.get('caseId') || url.pathname.split('/').pop();
+
+    // Try multiple selector patterns to find homeowner name
+    let homeownerName = null;
+    let homeownerPhone = null;
+    let address = null;
+
+    // Pattern 1: Look for homeowner name in readonly input fields
+    const nameInput = document.querySelector('input[readonly*="name" i], input[aria-label*="name" i], mat-form-field:has(mat-label:contains("Homeowner")) input');
+    if (nameInput && nameInput.value) {
+      homeownerName = nameInput.value.trim();
+    }
+
+    // Pattern 2: Look in text content for homeowner name section
+    if (!homeownerName) {
+      const labels = Array.from(document.querySelectorAll('mat-label'));
+      const nameLabel = labels.find(l => l.textContent.includes('Homeowner Name') || l.textContent.includes('Customer Name'));
+      if (nameLabel) {
+        const formField = nameLabel.closest('mat-form-field');
+        if (formField) {
+          const input = formField.querySelector('input');
+          if (input && input.value) {
+            homeownerName = input.value.trim();
+          } else {
+            // Try to find displayed text
+            const textDiv = formField.querySelector('.mat-input-element, [class*="display"]');
+            if (textDiv) {
+              homeownerName = textDiv.textContent?.trim() || null;
+            }
+          }
+        }
+      }
+    }
+
+    // Pattern 3: Search all input fields for name-like data
+    if (!homeownerName) {
+      const allInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+      for (const input of allInputs) {
+        const value = input.value?.trim();
+        const label = input.getAttribute('aria-label') || '';
+        const placeholder = input.getAttribute('placeholder') || '';
+
+        // Skip empty values
+        if (!value || value.length < 2) continue;
+
+        // Skip obvious non-name fields
+        if (label.toLowerCase().includes('address') || label.toLowerCase().includes('zip') ||
+            placeholder.toLowerCase().includes('address') || placeholder.toLowerCase().includes('zip')) {
+          continue;
+        }
+
+        // Look for name-like patterns (2+ words, or capitalized)
+        if (value.includes(' ') && value.length < 50 && !value.includes('\n')) {
+          homeownerName = value;
+          break;
+        }
+      }
+    }
+
+    // Try to find phone number
+    const phoneInput = document.querySelector('input[type="tel"], input[aria-label*="phone" i], input[placeholder*="phone" i]');
+    if (phoneInput && phoneInput.value) {
+      homeownerPhone = phoneInput.value.trim();
+    }
+
+    // Fallback: look for phone pattern in all inputs
+    if (!homeownerPhone) {
+      const allInputs = Array.from(document.querySelectorAll('input'));
+      for (const input of allInputs) {
+        const value = input.value?.trim();
+        if (value && /^\d{10}|\(\d{3}\)\s*\d{3}[-\s]?\d{4}/.test(value.replace(/\D/g, ''))) {
+          homeownerPhone = value;
+          break;
+        }
+      }
+    }
+
+    // Try to find address from page
+    const addressInput = document.querySelector('input[aria-label*="address" i], input[placeholder*="address" i], mat-form-field:has(mat-label:contains("Address")) input');
+    if (addressInput && addressInput.value) {
+      address = addressInput.value.trim();
+    }
+
+    // Check if customer is qualified (not disqualified)
+    const pageText = document.body.textContent || '';
+    const isQualified = !pageText.toLowerCase().includes('not qualified') &&
+                       !pageText.toLowerCase().includes('disqualified') &&
+                       !pageText.toLowerCase().includes('ineligible');
+
+    const customerData = {
+      caseId,
+      address,
+      homeownerName,
+      homeownerPhone,
+      isQualified,
+      capturedAt: new Date().toISOString()
+    };
+
+    // Only send if we found at least some data
+    if (homeownerName || homeownerPhone || address) {
+      log(`  ✓ Captured data: Name="${homeownerName || 'N/A'}", Phone="${homeownerPhone || 'N/A'}", Qualified=${isQualified}`);
+
+      // Send to background script for route planner
+      chrome.runtime.sendMessage({
+        action: 'addCaseToRoute',
+        data: customerData
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          log(`  ⚠️ Failed to send data to background: ${chrome.runtime.lastError.message}`);
+        } else if (response && response.success) {
+          log(`  ✓ Data sent to route planner successfully`);
+        }
+      });
+
+      return customerData;
+    } else {
+      log(`  ⚠️ No customer data found on page`);
+      return null;
+    }
+  } catch (error) {
+    log(`  ❌ Error capturing customer data: ${error.message}`);
+    return null;
+  }
+}
+
+// ============================================
 // APPLICATION STATUS - ACCEPT LEAD
 // ============================================
 async function acceptLead() {
   log('📋 Application Status...');
+
+  // NEW: Capture customer data from Application Status page
+  await sleep(1000); // Wait for page to stabilize
+  const capturedData = captureCustomerData();
+
+  if (capturedData) {
+    log(`  ✓ Customer data captured for route planner`);
+  }
 
   // Check if auto-accept is enabled
   if (config.autoAcceptLead !== 'true' && config.autoAcceptLead !== true) {
@@ -2506,7 +2666,9 @@ async function runFillForm() {
         throw err;
       }
       log(`  ⚠️ Error in ${step.name}: ${err.message}`);
-      showError(`Error in ${step.name}`, err.message);
+      if (typeof globalThis.showError === 'function') {
+        globalThis.showError(`Error in ${step.name}`, err.message);
+      }
     }
 
     // Check if stopped during action execution
@@ -2726,7 +2888,9 @@ function setupSidebarObserver() {
       }
     } catch (err) {
       log('  ⚠️ Sidebar observer error: ' + err.message);
-      showWarning('Sidebar observer error: ' + err.message);
+      if (typeof globalThis.showWarning === 'function') {
+        globalThis.showWarning('Sidebar observer error: ' + err.message);
+      }
     }
   });
 
@@ -2751,10 +2915,29 @@ function initOnPageLoad() {
   // This ensures the section button updates when user clicks sidebar
   setupSidebarObserver();
 
-  // Show banner on form pages
-  if (['customer-search', 'customer-information', 'additional-customer-info', 'enrollment-information',
+  // Auto-capture customer data on Application Status page
+  if (page === 'application-status') {
+    // Wait a bit for page to fully render, then capture data
+    setTimeout(() => {
+      const capturedData = captureCustomerData();
+      if (capturedData) {
+        log('✅ Auto-captured customer data for route planner');
+        // Show info banner to user
+        if (typeof globalThis.showInfo === 'function') {
+          globalThis.showInfo('Customer data captured for route planner');
+        }
+      }
+    }, 2000);
+
+    // Show banner if auto-fill prompt is enabled
+    if (config.autoFillPrompt) {
+      setTimeout(showBanner, 1500);
+    }
+  }
+  // Show banner on other form pages
+  else if (['customer-search', 'customer-information', 'additional-customer-info', 'enrollment-information',
        'household-members', 'project-information', 'trade-ally-information', 'appointment-contact',
-       'assessment-questionnaire', 'application-status'].includes(page)) {
+       'assessment-questionnaire'].includes(page)) {
     if (config.autoFillPrompt) {
       setTimeout(showBanner, 1500);
     }
@@ -2776,6 +2959,12 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   }
   if (request.action === 'detectPage') {
     sendResponse({ page: detectCurrentPage(), sectionTitle: getActiveSectionTitle() });
+    return true;
+  }
+  if (request.action === 'captureCustomerData') {
+    // Manual capture request from background script
+    const capturedData = captureCustomerData();
+    sendResponse({ success: !!capturedData, data: capturedData });
     return true;
   }
 });

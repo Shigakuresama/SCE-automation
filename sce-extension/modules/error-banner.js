@@ -158,3 +158,11 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+// Make functions available globally for non-module scripts
+if (typeof globalThis !== 'undefined') {
+  globalThis.showError = showError;
+  globalThis.showWarning = showWarning;
+  globalThis.showInfo = showInfo;
+  globalThis.clearAllBanners = clearAllBanners;
+}

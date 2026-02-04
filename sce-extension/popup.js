@@ -4,8 +4,11 @@
 
 const pageInfo = document.getElementById('pageInfo');
 const fillBtn = document.getElementById('fillBtn');
-const settingsBtn = document.getElementById('settingsBtn');
+const openOptionsBtn = document.getElementById('openOptionsBtn');
 const statusDiv = document.getElementById('status');
+
+// Route planner module (lazy loaded)
+let routePlannerInitialized = false;
 
 // Check proxy server status
 async function checkProxyStatus() {
@@ -117,7 +120,88 @@ fillBtn.addEventListener('click', () => {
   });
 });
 
-// Settings button
-settingsBtn.addEventListener('click', () => {
+// Open Options button
+openOptionsBtn.addEventListener('click', () => {
   chrome.runtime.openOptionsPage();
+});
+
+// Save Settings button
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+if (saveSettingsBtn) {
+  saveSettingsBtn.addEventListener('click', () => {
+    const proxyUrl = document.getElementById('proxyUrl').value;
+    chrome.storage.sync.set({ proxyUrl }, () => {
+      const statusDiv = document.getElementById('settingsStatus');
+      if (statusDiv) {
+        statusDiv.textContent = '✅ Settings saved!';
+        statusDiv.className = 'status success';
+        setTimeout(() => {
+          statusDiv.className = 'status';
+        }, 2000);
+      }
+    });
+  });
+}
+
+// ============================================
+// TAB NAVIGATION
+// ============================================
+
+/**
+ * Switch between tabs
+ */
+function switchTab(tabName) {
+  // Hide all tabs
+  document.querySelectorAll('.tab-content').forEach(tab => {
+    tab.classList.remove('active');
+  });
+
+  // Deactivate all buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  // Show selected tab
+  const selectedTab = document.getElementById(`${tabName}-tab`);
+  if (selectedTab) {
+    selectedTab.classList.add('active');
+  }
+
+  // Activate button
+  const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+
+  // Lazy load route planner module when switching to route planner tab
+  if (tabName === 'route-planner' && !routePlannerInitialized) {
+    initRoutePlanner();
+  }
+}
+
+/**
+ * Initialize route planner module
+ */
+async function initRoutePlanner() {
+  try {
+    // Load the route planner module
+    const module = await import('./modules/route-planner.js');
+    if (module.init) {
+      module.init();
+      routePlannerInitialized = true;
+      console.log('Route Planner module loaded');
+    }
+  } catch (error) {
+    console.error('Failed to load Route Planner module:', error);
+  }
+}
+
+// Setup tab navigation
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    const tabName = e.target.dataset.tab;
+    if (tabName) {
+      switchTab(tabName);
+    }
+  });
 });
