@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCE Route Planner</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <h1>🗺️ SCE Route Planner</h1>
+    </header>
+
+    <main class="app-main">
+      <section class="mode-section">
+        <div class="mode-tabs">
+          <button class="mode-tab active" data-mode="map">📍 Map View</button>
+          <button class="mode-tab" data-mode="range">🔢 Address Range</button>
+        </div>
+      </section>
+
+      <section id="mapMode" class="mode-content active">
+        <div class="map-controls">
+          <div class="map-search">
+            <input type="text" id="mapSearchInput" placeholder="Search address (e.g., 1909 W Martha Ln, Santa Ana, CA)">
+            <button id="mapSearchBtn">🔍 Search</button>
+          </div>
+          <div class="map-draw-buttons">
+            <button id="drawRectBtn" class="btn-secondary">▢ Draw Rectangle</button>
+            <button id="drawCircleBtn" class="btn-secondary">○ Draw Circle</button>
+            <button id="undoBtn" disabled>↩ Undo</button>
+            <button id="clearBtn" disabled>🗑 Clear</button>
+          </div>
+        </div>
+        <div id="map" class="map-container"></div>
+        <div id="selectedAddresses" class="selected-addresses">
+          <h3>Selected Addresses (<span id="selectedCount">0</span>)</h3>
+          <div id="addressList" class="address-list"></div>
+        </div>
+      </section>
+
+      <section id="rangeMode" class="mode-content">
+        <form id="addressRangeForm" class="address-form">
+          <div class="form-row">
+            <label>Start Address:</label>
+            <input type="text" id="startAddress" placeholder="1909 W Martha Ln" required>
+          </div>
+          <div class="form-row">
+            <label>End Address:</label>
+            <input type="text" id="endAddress" placeholder="1925 W Martha Ln" required>
+          </div>
+          <div class="form-row">
+            <label>City:</label>
+            <input type="text" id="city" placeholder="Santa Ana" required>
+          </div>
+          <div class="form-row">
+            <label>State:</label>
+            <input type="text" id="state" placeholder="CA" required>
+          </div>
+          <div class="form-row">
+            <label>ZIP Code:</label>
+            <input type="text" id="zipCode" placeholder="92706" required>
+          </div>
+          <div class="form-row">
+            <label>Side:</label>
+            <select id="side">
+              <option value="both">Both sides</option>
+              <option value="odd">Odd only</option>
+              <option value="even">Even only</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Skip Addresses (comma-separated):</label>
+            <input type="text" id="skipAddresses" placeholder="1915, 1921">
+          </div>
+          <button type="submit" class="btn-primary">Generate Addresses</button>
+        </form>
+        <div id="generatedAddresses" class="generated-addresses hidden">
+          <h3>Generated Addresses (<span id="generatedCount">0</span>)</h3>
+          <div id="generatedList" class="address-list"></div>
+        </div>
+      </section>
+
+      <section id="routeSummary" class="route-summary hidden">
+        <h2>📋 Route Summary</h2>
+        <div class="summary-stats">
+          <div class="stat">
+            <span class="stat-label">Total Addresses:</span>
+            <span class="stat-value" id="summaryTotal">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Area:</span>
+            <span class="stat-value" id="summaryArea">-</span>
+          </div>
+        </div>
+        <button id="generatePdfBtn" class="btn-primary">📄 Generate PDF</button>
+      </section>
+    </main>
+
+    <div id="statusMessage" class="status-message hidden"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
