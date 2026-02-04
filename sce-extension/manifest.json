@@ -6,7 +6,8 @@
   "permissions": [
     "storage",
     "contextMenus",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "https://sce.dsmcentral.com/*",
@@ -24,7 +25,7 @@
         "https://sce-trade-ally-community.my.site.com/*",
         "http://localhost:8080/*"
       ],
-      "js": ["utils.js", "content.js"],
+      "js": ["utils.js", "modules/error-banner.js", "modules/loader.js", "content.js"],
       "css": ["banner.css"]
     }
   ],

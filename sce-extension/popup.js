@@ -83,7 +83,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                         'trade-ally-information', 'appointment-contact', 'appointments',
                         'assessment-questionnaire', 'equipment-information', 'basic-enrollment-equipment',
                         'bonus-adjustment-measures', 'review-terms', 'file-uploads', 'review-comments',
-                        'measure-info', 'application-status'];
+                        'application-status'];
       fillBtn.disabled = !formPages.includes(pageKey);
 
       if (!formPages.includes(pageKey)) {
