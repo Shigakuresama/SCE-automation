@@ -29,7 +29,8 @@ class RoutePlannerApp {
       routeVisualizer: null,
       routeList: null,
       sceAutomation: null,
-      capturedCustomerData: [] // Stores {address, customerName, phone, caseId}
+      capturedCustomerData: [], // Stores {address, customerName, phone, caseId}
+      autoGeneratePDF: false // Flag to auto-generate PDF after processing
     };
 
     // PDF generator instance
@@ -293,11 +294,17 @@ class RoutePlannerApp {
     );
 
     // Check if all addresses processed
-    const totalToProcess = this.state.generatedAddresses.length || this.state.selectedAddresses.length || 0;
+    const totalToProcess = this.getActiveAddresses().length;
     if (this.state.capturedCustomerData.length >= totalToProcess) {
-      this.showStatus('All addresses processed! Generate PDF to see results.', 'success');
+      this.showStatus('All addresses processed!', 'success');
       // Enable PDF generation
       this.elements.generatePdfBtn.disabled = false;
+
+      // Auto-generate PDF if flag is set
+      if (this.state.autoGeneratePDF) {
+        this.state.autoGeneratePDF = false; // Reset flag
+        setTimeout(() => this.handleGeneratePDF(), 500); // Small delay before generating
+      }
     }
   }
 
@@ -752,6 +759,86 @@ class RoutePlannerApp {
     } catch (error) {
       console.error('[App] PDF generation error:', error);
       this.showStatus('Failed to generate PDF: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Handle Process & Generate PDF button click
+   * Process addresses through SCE forms and auto-generate PDF when complete
+   */
+  async handleProcessAndGeneratePDF() {
+    const addresses = this.getActiveAddresses();
+
+    if (addresses.length === 0) {
+      this.showStatus('No addresses to process', 'warning');
+      return;
+    }
+
+    console.log('[App] Processing and generating PDF for', addresses.length, 'addresses');
+
+    // Set flag to auto-generate PDF after processing
+    this.state.autoGeneratePDF = true;
+
+    // Clear any previous captured data
+    this.state.capturedCustomerData = [];
+
+    // Disable buttons during processing
+    if (this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.disabled = true;
+    }
+    if (this.elements.rangeProcessBtn) {
+      this.elements.rangeProcessBtn.disabled = true;
+    }
+    this.elements.generatePdfBtn.disabled = true;
+
+    // Initialize SCE automation if not already done
+    if (!this.state.sceAutomation) {
+      this.state.sceAutomation = new SCEAutomation({
+        onProgress: (progress) => {
+          this.showStatus(
+            `Processing: ${progress.completed}/${progress.total} - ${progress.current.address}`,
+            'info'
+          );
+        },
+        onComplete: (results) => {
+          this.showStatus(`Completed ${results.length} addresses`, 'success');
+          // Re-enable buttons
+          if (this.elements.mapProcessBtn) {
+            this.elements.mapProcessBtn.disabled = false;
+          }
+          if (this.elements.rangeProcessBtn) {
+            this.elements.rangeProcessBtn.disabled = false;
+          }
+        },
+        onError: (error) => {
+          this.showStatus(`Error: ${error.address} - ${error.error}`, 'error');
+          // Re-enable buttons on error
+          if (this.elements.mapProcessBtn) {
+            this.elements.mapProcessBtn.disabled = false;
+          }
+          if (this.elements.rangeProcessBtn) {
+            this.elements.rangeProcessBtn.disabled = false;
+          }
+          this.elements.generatePdfBtn.disabled = false;
+        }
+      });
+    }
+
+    // Start processing
+    try {
+      await this.state.sceAutomation.process(addresses);
+    } catch (error) {
+      console.error('[App] SCE automation error:', error);
+      this.showStatus(`Processing failed: ${error.message}`, 'error');
+      // Re-enable buttons on error
+      if (this.elements.mapProcessBtn) {
+        this.elements.mapProcessBtn.disabled = false;
+      }
+      if (this.elements.rangeProcessBtn) {
+        this.elements.rangeProcessBtn.disabled = false;
+      }
+      this.elements.generatePdfBtn.disabled = false;
+      this.state.autoGeneratePDF = false;
     }
   }
 
