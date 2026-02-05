@@ -4,6 +4,7 @@
  */
 
 const SCE_BASE_URL = 'https://sce.dsmcentral.com';
+const SCE_LOGIN_URL = 'https://sce-trade-ally-community.my.site.com/tradeally/s/login/';
 const BATCH_DELAY = 2000; // 2 seconds between addresses
 
 export class SCEAutomation {
@@ -127,9 +128,8 @@ export class SCEAutomation {
    * @private
    */
   _buildSCEUrl(address) {
-    // Build URL based on address components
-    // This will be customized based on actual SCE form structure
-    return `${SCE_BASE_URL}/application/new`;
+    // Start at login page - userscript will handle login and navigate to customer search
+    return SCE_LOGIN_URL;
   }
 
   /**
