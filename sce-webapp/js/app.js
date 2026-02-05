@@ -12,7 +12,6 @@ import { PreviewModal } from './preview-modal.js';
 import { RouteVisualizer } from './route-visualizer.js';
 import { RouteList } from './route-list.js';
 import { SCEAutomation } from './sce-automation.js';
-import { ProgressPersistence } from './progress-persistence.js';
 
 class RoutePlannerApp {
   constructor() {
@@ -30,8 +29,8 @@ class RoutePlannerApp {
       routeVisualizer: null,
       routeList: null,
       sceAutomation: null,
-      progressPersistence: null,
-      automationProgress: null
+      capturedCustomerData: [], // Stores {address, customerName, phone, caseId}
+      autoGeneratePDF: false // Flag to auto-generate PDF after processing
     };
 
     // PDF generator instance
@@ -55,8 +54,8 @@ class RoutePlannerApp {
     this.cacheElements();
     this.setupEventListeners();
     this.initMapView();
-    this.initAutomation();
     this.loadSettings();
+    this.setupSCEMessageListener();
     console.log('[App] SCE Route Planner initialized');
   }
 
@@ -70,6 +69,7 @@ class RoutePlannerApp {
     // Mode containers
     this.elements.mapMode = document.getElementById('mapMode');
     this.elements.rangeMode = document.getElementById('rangeMode');
+    this.elements.blockRoutingMode = document.getElementById('blockRoutingMode');
     this.elements.routeSummary = document.getElementById('routeSummary');
 
     // Map controls
@@ -84,6 +84,8 @@ class RoutePlannerApp {
     // Address display
     this.elements.selectedCount = document.getElementById('selectedCount');
     this.elements.addressList = document.getElementById('addressList');
+    this.elements.mapProcessBtn = document.getElementById('mapProcessBtn');
+    this.elements.rangeProcessBtn = document.getElementById('rangeProcessBtn');
 
     // Range form
     this.elements.addressRangeForm = document.getElementById('addressRangeForm');
@@ -148,6 +150,16 @@ class RoutePlannerApp {
     this.elements.undoBtn.addEventListener('click', () => this.handleUndo());
     this.elements.clearBtn.addEventListener('click', () => this.handleClear());
 
+    // Map Process button
+    if (this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.addEventListener('click', () => this.handleProcessAndGeneratePDF());
+    }
+
+    // Range Process button
+    if (this.elements.rangeProcessBtn) {
+      this.elements.rangeProcessBtn.addEventListener('click', () => this.handleProcessAndGeneratePDF());
+    }
+
     // Address range form
     this.elements.addressRangeForm.addEventListener('submit', (e) => this.handleGenerateRange(e));
 
@@ -201,29 +213,6 @@ class RoutePlannerApp {
   }
 
   /**
-   * Initialize SCE automation and progress tracking
-   */
-  initAutomation() {
-    try {
-      this.state.sceAutomation = new SCEAutomation({
-        onProgress: (progress) => this.handleAutomationProgress(progress),
-        onComplete: (completed) => this.handleAutomationComplete(completed),
-        onError: (error) => this.handleAutomationError(error)
-      });
-
-      this.state.progressPersistence = new ProgressPersistence();
-
-      // Check for existing progress on load
-      this.checkForExistingProgress();
-
-      console.log('[App] SCE Automation initialized');
-    } catch (error) {
-      console.error('[App] Failed to initialize SCE Automation:', error);
-      this.showStatus('Failed to initialize automation. Check console for details.', 'error');
-    }
-  }
-
-  /**
    * Load settings from localStorage
    */
   loadSettings() {
@@ -261,6 +250,73 @@ class RoutePlannerApp {
     };
 
     Storage.set('appSettings', settings);
+  }
+
+  /**
+   * Setup message listener for SCE userscript communication
+   */
+  setupSCEMessageListener() {
+    window.addEventListener('message', (event) => {
+      const { type, data } = event.data;
+
+      // Only process known message types
+      if (!['ADDRESS_COMPLETE', 'SCRIPT_ERROR', 'SCRIPT_READY'].includes(type)) {
+        return;
+      }
+
+      console.log('[App] Received message:', type, 'from:', event.origin, data);
+
+      if (type === 'ADDRESS_COMPLETE') {
+        this.handleAddressComplete(data);
+      } else if (type === 'SCRIPT_ERROR') {
+        this.handleSCEError(data);
+      } else if (type === 'SCRIPT_READY') {
+        console.log('[App] SCE userscript is ready');
+      }
+    });
+  }
+
+  /**
+   * Handle address completion from SCE userscript
+   */
+  handleAddressComplete(data) {
+    console.log('[App] Address complete:', data);
+
+    // Store captured customer data
+    this.state.capturedCustomerData.push({
+      address: data.address,
+      customerName: data.customerName || '',
+      phone: data.phone || '',
+      caseId: data.caseId || ''
+    });
+
+    // Show status
+    this.showStatus(
+      `Captured: ${data.address}${data.customerName ? ' - ' + data.customerName : ''}`,
+      'success'
+    );
+
+    // Check if all addresses processed
+    const totalToProcess = this.getActiveAddresses().length;
+    if (this.state.capturedCustomerData.length >= totalToProcess) {
+      this.showStatus('All addresses processed!', 'success');
+      // Enable PDF generation
+      this.elements.generatePdfBtn.disabled = false;
+
+      // Auto-generate PDF if flag is set
+      if (this.state.autoGeneratePDF) {
+        this.state.autoGeneratePDF = false; // Reset flag
+        setTimeout(() => this.handleGeneratePDF(), 500); // Small delay before generating
+      }
+    }
+  }
+
+  /**
+   * Handle error from SCE userscript
+   */
+  handleSCEError(data) {
+    console.error('[App] SCE error:', data);
+    this.showStatus(`Error: ${data.message}`, 'error');
   }
 
   // ============================================
@@ -304,6 +360,7 @@ class RoutePlannerApp {
       // Block mode - hide other modes, show block routing view
       this.elements.mapMode.classList.remove('active');
       this.elements.rangeMode.classList.remove('active');
+      this.elements.blockRoutingMode.classList.add('active');
     }
 
     // Update route summary based on active mode
@@ -398,6 +455,11 @@ class RoutePlannerApp {
     this.state.selectedAddresses = this.state.mapView.getSelectedAddresses();
     this.updateSelectedAddresses();
     this._updateUndoClearButtons();
+
+    // Update Process button state
+    if (this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.disabled = this.state.selectedAddresses.length === 0;
+    }
   }
 
   /**
@@ -409,6 +471,12 @@ class RoutePlannerApp {
     this.state.selectedAddresses = [];
     this.updateSelectedAddresses();
     this._updateUndoClearButtons();
+
+    // Disable Process button when no addresses
+    if (this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.disabled = true;
+    }
+
     this.showStatus('Cleared all selections', 'info');
   }
 
@@ -433,6 +501,12 @@ class RoutePlannerApp {
     this.updateSelectedAddresses();
     this._updateUndoClearButtons();
     this.updateRouteSummary();
+
+    // Enable Process button when addresses are selected
+    if (this.state.selectedAddresses.length > 0 && this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.disabled = false;
+    }
+
     console.log('[App] Address selected:', address.full || address.display_name);
   }
 
@@ -455,6 +529,12 @@ class RoutePlannerApp {
     this.updateSelectedAddresses();
     this._updateUndoClearButtons();
     this.updateRouteSummary();
+
+    // Enable Process button when addresses are selected
+    if (this.state.selectedAddresses.length > 0 && this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.disabled = false;
+    }
+
     this.showStatus(`Selected ${addresses.length} addresses from zone`, 'success');
   }
 
@@ -543,6 +623,11 @@ class RoutePlannerApp {
       this.state.generatedAddresses = addresses;
       this.updateGeneratedAddresses();
       this.updateRouteSummary();
+
+      // Enable Process button when addresses are generated
+      if (this.state.generatedAddresses.length > 0 && this.elements.rangeProcessBtn) {
+        this.elements.rangeProcessBtn.disabled = false;
+      }
 
       this.showStatus(`Generated ${addresses.length} addresses`, 'success');
 
@@ -649,12 +734,27 @@ class RoutePlannerApp {
     this.showStatus('Generating PDF...', 'info');
 
     try {
+      // Merge addresses with captured customer data
+      const addressesWithData = addresses.map(addr => {
+        const fullAddress = addr.full || addr;
+        const captured = this.state.capturedCustomerData.find(
+          c => c.address === fullAddress
+        );
+
+        return {
+          address: fullAddress,
+          customerName: captured?.customerName || '',
+          phone: captured?.phone || '',
+          caseId: captured?.caseId || ''
+        };
+      });
+
       // Generate filename with timestamp
       const date = new Date();
       const timestamp = date.toISOString().slice(0, 10);
       const filename = `sce-route-${timestamp}.pdf`;
 
-      await this.pdfGenerator.generateAndDownload(addresses, filename);
+      await this.pdfGenerator.generateAndDownload(addressesWithData, filename);
 
       this.showStatus('PDF downloaded successfully', 'success');
       console.log('[App] PDF generated:', filename);
@@ -662,6 +762,86 @@ class RoutePlannerApp {
     } catch (error) {
       console.error('[App] PDF generation error:', error);
       this.showStatus('Failed to generate PDF: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Handle Process & Generate PDF button click
+   * Process addresses through SCE forms and auto-generate PDF when complete
+   */
+  async handleProcessAndGeneratePDF() {
+    const addresses = this.getActiveAddresses();
+
+    if (addresses.length === 0) {
+      this.showStatus('No addresses to process', 'warning');
+      return;
+    }
+
+    console.log('[App] Processing and generating PDF for', addresses.length, 'addresses');
+
+    // Set flag to auto-generate PDF after processing
+    this.state.autoGeneratePDF = true;
+
+    // Clear any previous captured data
+    this.state.capturedCustomerData = [];
+
+    // Disable buttons during processing
+    if (this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.disabled = true;
+    }
+    if (this.elements.rangeProcessBtn) {
+      this.elements.rangeProcessBtn.disabled = true;
+    }
+    this.elements.generatePdfBtn.disabled = true;
+
+    // Initialize SCE automation if not already done
+    if (!this.state.sceAutomation) {
+      this.state.sceAutomation = new SCEAutomation({
+        onProgress: (progress) => {
+          this.showStatus(
+            `Processing: ${progress.completed}/${progress.total} - ${progress.current.address}`,
+            'info'
+          );
+        },
+        onComplete: (results) => {
+          this.showStatus(`Completed ${results.length} addresses`, 'success');
+          // Re-enable buttons
+          if (this.elements.mapProcessBtn) {
+            this.elements.mapProcessBtn.disabled = false;
+          }
+          if (this.elements.rangeProcessBtn) {
+            this.elements.rangeProcessBtn.disabled = false;
+          }
+        },
+        onError: (error) => {
+          this.showStatus(`Error: ${error.address} - ${error.error}`, 'error');
+          // Re-enable buttons on error
+          if (this.elements.mapProcessBtn) {
+            this.elements.mapProcessBtn.disabled = false;
+          }
+          if (this.elements.rangeProcessBtn) {
+            this.elements.rangeProcessBtn.disabled = false;
+          }
+          this.elements.generatePdfBtn.disabled = false;
+        }
+      });
+    }
+
+    // Start processing
+    try {
+      await this.state.sceAutomation.process(addresses);
+    } catch (error) {
+      console.error('[App] SCE automation error:', error);
+      this.showStatus(`Processing failed: ${error.message}`, 'error');
+      // Re-enable buttons on error
+      if (this.elements.mapProcessBtn) {
+        this.elements.mapProcessBtn.disabled = false;
+      }
+      if (this.elements.rangeProcessBtn) {
+        this.elements.rangeProcessBtn.disabled = false;
+      }
+      this.elements.generatePdfBtn.disabled = false;
+      this.state.autoGeneratePDF = false;
     }
   }
 
@@ -674,6 +854,13 @@ class RoutePlannerApp {
    */
   handleRoundBlock() {
     if (!this.state.mapView) return;
+
+    // Switch to map mode if not already there
+    if (this.state.mode !== 'map') {
+      this.switchMode('map');
+    }
+
+    // Enable block mode on the main map
     this.state.mapView.enableBlockMode();
     this.showStatus('Click on the map to detect a block', 'info');
   }
@@ -721,12 +908,6 @@ class RoutePlannerApp {
     // Visualize route
     this.state.routeVisualizer.visualizeRoute(block);
 
-    // Show progress bar
-    const progressContainer = document.getElementById('progressContainer');
-    if (progressContainer) {
-      progressContainer.classList.add('active');
-    }
-
     // Show action buttons
     if (this.elements.clearRouteBtn) {
       this.elements.clearRouteBtn.style.display = 'inline-block';
@@ -734,9 +915,6 @@ class RoutePlannerApp {
     if (this.elements.blockActions) {
       this.elements.blockActions.style.display = 'flex';
     }
-
-    // Check for existing progress
-    this.checkForExistingProgress();
 
     this.showStatus(`Block detected with ${block.totalAddresses} addresses`, 'success');
   }
@@ -795,28 +973,6 @@ class RoutePlannerApp {
     if (this.elements.routeCount) {
       this.elements.routeCount.textContent = '0';
     }
-
-    // Hide and reset progress bar
-    const progressContainer = document.getElementById('progressContainer');
-    if (progressContainer) {
-      progressContainer.classList.remove('active');
-    }
-    const progressBar = document.getElementById('progressBar');
-    if (progressBar) {
-      progressBar.style.width = '0%';
-      progressBar.textContent = '';
-    }
-
-    // Reset Process All button
-    if (this.elements.processAllBtn) {
-      this.elements.processAllBtn.disabled = true;
-    }
-
-    // Clear any saved progress
-    if (this.state.progressPersistence) {
-      this.state.progressPersistence.clear();
-    }
-
     this.state.currentBlock = null;
     this.showStatus('Route cleared', 'info');
   }
@@ -824,146 +980,96 @@ class RoutePlannerApp {
   /**
    * Handle Test One button click
    */
-  async handleTestOne() {
-    if (!this.state.currentBlock || this.state.currentBlock.addresses.length === 0) {
-      this.showStatus('No addresses to process', 'error');
+  handleTestOne() {
+    this.showStatus('Test mode - processing first address only', 'info');
+
+    // Get addresses based on current mode
+    const addresses = this.state.mode === 'block'
+      ? this.state.currentBlock?.addresses
+      : this.state.generatedAddresses;
+
+    if (!addresses || addresses.length === 0) {
+      this.showStatus('No addresses to process', 'warning');
       return;
     }
 
-    const firstAddress = this.state.currentBlock.addresses[0];
-
-    try {
-      this.elements.testOneBtn.disabled = true;
-      this.elements.testOneBtn.textContent = 'Testing...';
-
-      const result = await this.state.sceAutomation.process([firstAddress]);
-
-      this.showStatus(`Test complete: ${result[0].customerName}`, 'success');
-
-      // Enable Process All button
-      this.elements.processAllBtn.disabled = false;
-    } catch (error) {
-      this.showStatus(`Test failed: ${error.message}`, 'error');
-    } finally {
-      this.elements.testOneBtn.disabled = false;
-      this.elements.testOneBtn.textContent = 'Test 1 Address';
-    }
+    // Process just the first address
+    this.processAddresses([addresses[0]]);
   }
 
   /**
    * Handle Process All button click
    */
-  async handleProcessAll() {
-    if (!this.state.currentBlock || this.state.currentBlock.addresses.length === 0) {
-      this.showStatus('No addresses to process', 'error');
+  handleProcessAll() {
+    this.showStatus('Processing all addresses...', 'info');
+
+    // Get addresses based on current mode
+    const addresses = this.state.mode === 'block'
+      ? this.state.currentBlock?.addresses
+      : this.state.generatedAddresses;
+
+    if (!addresses || addresses.length === 0) {
+      this.showStatus('No addresses to process', 'warning');
       return;
     }
 
-    const proceed = confirm(`Process ${this.state.currentBlock.totalAddresses} addresses? This will take ${this.state.currentBlock.estimatedTime}`);
-    if (!proceed) return;
+    // Disable button during processing
+    this.elements.processAllBtn.disabled = true;
 
+    // Process all addresses
+    this.processAddresses(addresses);
+  }
+
+  /**
+   * Process addresses through SCE automation
+   */
+  async processAddresses(addresses) {
+    // Initialize SCE automation
+    if (!this.state.sceAutomation) {
+      this.state.sceAutomation = new SCEAutomation({
+        onProgress: (progress) => {
+          const percent = Math.round((progress.completed / progress.total) * 100);
+          const currentAddress = progress.current.address || progress.current.full || '';
+
+          this.showStatus(
+            `Processing: ${progress.completed}/${progress.total} (${percent}%) - ${currentAddress}`,
+            'info'
+          );
+
+          // Update process-status span if exists
+          const statusSpan = document.querySelector('.process-status');
+          if (statusSpan) {
+            statusSpan.textContent = `${progress.completed}/${progress.total} (${percent}%)`;
+          }
+        },
+        onComplete: (results) => {
+          this.showStatus(`Completed ${results.length} addresses`, 'success');
+          this.elements.processAllBtn.disabled = false;
+
+          // Clear process-status span when complete
+          const statusSpan = document.querySelector('.process-status');
+          if (statusSpan) {
+            statusSpan.textContent = '';
+          }
+        },
+        onError: (error) => {
+          this.showStatus(`Error: ${error.address} - ${error.error}`, 'error');
+        }
+      });
+    }
+
+    // Start processing
     try {
-      this.elements.processAllBtn.disabled = true;
-      this.elements.processAllBtn.textContent = 'Processing...';
-
-      // Save initial progress
-      this.state.progressPersistence.save({
-        blockId: this.state.currentBlock.blockId,
-        completed: [],
-        remaining: this.state.currentBlock.addresses
-      });
-
-      await this.state.sceAutomation.process(this.state.currentBlock.addresses);
+      await this.state.sceAutomation.process(addresses);
     } catch (error) {
-      this.showStatus(`Processing error: ${error.message}`, 'error');
-    } finally {
+      console.error('[App] SCE automation error:', error);
+      this.showStatus(`Processing failed: ${error.message}`, 'error');
       this.elements.processAllBtn.disabled = false;
-      this.elements.processAllBtn.textContent = 'Process All';
-    }
-  }
 
-  /**
-   * Handle automation progress updates
-   */
-  handleAutomationProgress(progress) {
-    console.log('Progress:', progress);
-
-    // Update route list with status
-    if (this.state.routeList && progress.current) {
-      this.state.routeList.updateItem(progress.completed - 1, progress.current);
-    }
-
-    // Update progress bar if exists
-    const progressBar = document.getElementById('progressBar');
-    if (progressBar) {
-      const percent = (progress.completed / progress.total) * 100;
-      progressBar.style.width = `${percent}%`;
-      progressBar.textContent = `${progress.completed}/${progress.total}`;
-    }
-
-    // Save progress
-    if (this.state.currentBlock) {
-      this.state.progressPersistence.save({
-        blockId: this.state.currentBlock.blockId,
-        completed: this.state.sceAutomation.completed,
-        remaining: this.state.sceAutomation.queue
-      });
-    }
-  }
-
-  /**
-   * Handle automation completion
-   */
-  handleAutomationComplete(completed) {
-    this.showStatus(`Processing complete! ${completed.length} addresses processed.`, 'success');
-
-    // Clear progress
-    this.state.progressPersistence.clear();
-
-    // Generate PDF
-    if (completed.length > 0) {
-      this.generatePDFWithCustomerData(completed);
-    }
-  }
-
-  /**
-   * Handle automation error
-   */
-  handleAutomationError(error) {
-    console.error('Automation error:', error);
-    this.showStatus(`Error processing address: ${error.address?.full || 'Unknown'} - ${error.error}`, 'error');
-  }
-
-  /**
-   * Generate PDF with customer data
-   */
-  async generatePDFWithCustomerData(addresses) {
-    // TODO: Implement multi-page PDF generation
-    console.log('Generating PDF with', addresses.length, 'addresses');
-
-    // For now, use existing PDF generator
-    const generator = this.pdfGenerator || new PDFGenerator();
-    await generator.generateAndDownload(addresses);
-  }
-
-  /**
-   * Check for existing progress and prompt to resume
-   */
-  checkForExistingProgress() {
-    if (!this.state.currentBlock) return;
-
-    const summary = this.state.progressPersistence.getSummary(this.state.currentBlock.blockId);
-
-    if (summary && summary.remaining.length > 0) {
-      const resume = confirm(`Resume previous session? (${summary.completed}/${summary.total} complete, ${summary.timeElapsed})`);
-
-      if (resume) {
-        // Restore progress
-        this.state.sceAutomation.queue = [...summary.remaining];
-        this.state.sceAutomation.completed = summary.completed;
-        this.handleProcessAll();
-      } else {
-        this.state.progressPersistence.clear();
+      // Clear process-status span on error
+      const statusSpan = document.querySelector('.process-status');
+      if (statusSpan) {
+        statusSpan.textContent = '';
       }
     }
   }

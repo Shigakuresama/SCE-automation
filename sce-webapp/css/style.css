@@ -136,6 +136,18 @@ body {
   padding: 10px;
 }
 
+.address-actions {
+  margin-top: 15px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.process-status {
+  font-size: 14px;
+  color: var(--secondary-color);
+}
+
 .address-item {
   padding: 8px;
   background: var(--bg-color);
@@ -184,13 +196,14 @@ body {
   color: white;
 }
 
-.btn-primary:hover {
-  background: #45a049;
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.btn-primary:disabled {
-  background: #ccc;
-  cursor: not-allowed;
+.btn-primary:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
 .btn-secondary {
@@ -397,115 +410,6 @@ body {
   justify-content: flex-end;
 }
 
-/* Three Panel Layout */
-.three-panel-layout {
-  display: flex;
-  gap: 15px;
-  height: 600px;
-}
-
-.panel-map {
-  flex: 7;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.panel-list {
-  flex: 2;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 15px;
-  background: white;
-  overflow: hidden;
-}
-
-.panel-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 15px;
-  background: white;
-}
-
-.panel-list h3,
-.panel-info h3 {
-  margin: 0 0 15px 0;
-  font-size: 14px;
-  color: var(--secondary-color);
-}
-
-.route-list {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.route-item {
-  padding: 8px;
-  background: var(--bg-color);
-  margin-bottom: 4px;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.route-item:hover {
-  background: #e3f2fd;
-}
-
-.route-item.active {
-  background: var(--primary-color);
-  color: white;
-}
-
-.route-item-number {
-  font-weight: bold;
-  display: inline-block;
-  width: 24px;
-}
-
-.block-info {
-  flex: 1;
-}
-
-.block-info-empty {
-  color: var(--secondary-color);
-  font-style: italic;
-  font-size: 13px;
-}
-
-.block-info-detail {
-  margin-bottom: 10px;
-}
-
-.block-info-label {
-  font-size: 11px;
-  color: var(--secondary-color);
-  text-transform: uppercase;
-}
-
-.block-info-value {
-  font-size: 14px;
-  font-weight: bold;
-  color: var(--primary-color);
-}
-
-.block-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 15px;
-}
-
-.block-actions button {
-  width: 100%;
-}
-
 /* Route List Component */
 .route-list-empty {
   text-align: center;
@@ -519,35 +423,3 @@ body {
   color: var(--success-color);
   font-weight: bold;
 }
-
-/* Progress bar */
-.progress-container {
-  margin-top: 15px;
-  display: none;
-}
-
-.progress-container.active {
-  display: block;
-}
-
-.progress-bar-bg {
-  height: 24px;
-  background: #e0e0e0;
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #1976D2, #4CAF50);
-  width: 0%;
-  transition: width 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 12px;
-  font-weight: bold;
-}
-

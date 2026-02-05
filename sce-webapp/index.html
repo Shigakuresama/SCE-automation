@@ -29,6 +29,7 @@
             <button id="mapSearchBtn">🔍 Search</button>
           </div>
           <div class="map-draw-buttons">
+            <button id="roundBlockBtn" class="btn-secondary">🗺️ Round Block</button>
             <button id="drawRectBtn" class="btn-secondary">▢ Draw Rectangle</button>
             <button id="drawCircleBtn" class="btn-secondary">○ Draw Circle</button>
             <button id="undoBtn" disabled>↩ Undo</button>
@@ -39,6 +40,10 @@
         <div id="selectedAddresses" class="selected-addresses">
           <h3>Selected Addresses (<span id="selectedCount">0</span>)</h3>
           <div id="addressList" class="address-list"></div>
+          <div class="address-actions">
+            <button id="mapProcessBtn" class="btn-primary" disabled>Process & Generate PDF</button>
+            <span class="process-status"></span>
+          </div>
         </div>
       </section>
 
@@ -81,6 +86,10 @@
         <div id="generatedAddresses" class="generated-addresses hidden">
           <h3>Generated Addresses (<span id="generatedCount">0</span>)</h3>
           <div id="generatedList" class="address-list"></div>
+          <div class="address-actions">
+            <button id="rangeProcessBtn" class="btn-primary" disabled>Process & Generate PDF</button>
+            <span class="process-status"></span>
+          </div>
         </div>
       </section>
 
@@ -105,7 +114,6 @@
           <!-- Map Panel -->
           <div class="panel-map">
             <div class="map-controls">
-              <button id="roundBlockBtn" class="btn-primary">🗺️ Round Block</button>
               <button id="clearRouteBtn" class="btn-secondary" style="display:none">🗑 Clear Route</button>
             </div>
             <div id="blockMap" class="map-container"></div>
@@ -122,11 +130,6 @@
             <h3>Block Info</h3>
             <div id="blockInfo" class="block-info">
               <p class="block-info-empty">Click "Round Block" to detect a block</p>
-            </div>
-            <div id="progressContainer" class="progress-container">
-              <div class="progress-bar-bg">
-                <div id="progressBar" class="progress-bar-fill"></div>
-              </div>
             </div>
             <div id="blockActions" class="block-actions" style="display:none;">
               <button id="testOneBtn" class="btn-secondary">Test 1 Address</button>

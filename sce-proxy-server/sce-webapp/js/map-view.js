@@ -4,6 +4,9 @@
  * Adapted from Chrome Extension for standalone webapp use
  */
 
+import { BlockDetector } from './block-detector.js';
+import { RouteVisualizer } from './route-visualizer.js';
+
 const DEFAULT_CENTER = [33.8, -117.8]; // Orange County, SCE service area
 const DEFAULT_ZOOM = 14;
 const PROXY_BASE_URL = 'http://localhost:3000';
@@ -33,6 +36,12 @@ class MapView {
     this.onAddressSelect = options.onAddressSelect || null;
     this.onZoneSelect = options.onZoneSelect || null;
     this.proxyUrl = options.proxyUrl || PROXY_BASE_URL;
+
+    // Block mode for perimeter routing
+    this.blockMode = options.blockMode || false;
+    this.onBlockDetect = options.onBlockDetect || null;
+    this.blockDetector = new BlockDetector(options.proxyUrl);
+    this.routeVisualizer = null;
 
     // Drawing mode state
     this.drawMode = null; // 'rectangle' or 'circle'
@@ -81,6 +90,11 @@ class MapView {
    * @param {L.MouseEvent} e - Leaflet click event
    */
   async handleMapClick(e) {
+    // If in block mode, don't add individual markers
+    if (this.blockMode) {
+      return;
+    }
+
     // If in drawing mode, don't handle as regular click
     if (this.isInDrawMode()) {
       return;
@@ -846,6 +860,49 @@ class MapView {
       bubbles: true
     });
     this.container.dispatchEvent(event);
+  }
+
+  // ============================================
+  // BLOCK PERIMETER ROUTING MODE
+  // ============================================
+
+  /**
+   * Enable block detection mode
+   * When enabled, next map click will detect a block and trigger onBlockDetect
+   */
+  enableBlockMode() {
+    this.blockMode = true;
+    this.container.style.cursor = 'crosshair';
+    this.map.once('click', this._handleBlockClick.bind(this));
+  }
+
+  /**
+   * Handle block detection click
+   * @private
+   */
+  async _handleBlockClick(e) {
+    const { lat, lng } = e.latlng;
+
+    try {
+      const block = await this.blockDetector.detectBlock(lat, lng);
+
+      if (this.onBlockDetect) {
+        this.onBlockDetect(block);
+      }
+    } catch (error) {
+      this._showError(`Block detection failed: ${error.message}`);
+    }
+
+    this.blockMode = false;
+    this.container.style.cursor = '';
+  }
+
+  /**
+   * Show error message
+   * @private
+   */
+  _showError(message) {
+    this._dispatchError(message);
   }
 }
 
