@@ -579,6 +579,83 @@ app.get('/api/geocode/bounds', async (req, res) => {
   }
 });
 
+// Get addresses within bounds (for rectangle/circle selection)
+app.post('/api/geocode/bounds', async (req, res) => {
+  try {
+    const { southWest, northEast } = req.body;
+
+    if (!southWest || !northEast) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'southWest and northEast are required'
+      });
+    }
+
+    if (!southWest.lat || !southWest.lng || !northEast.lat || !northEast.lng) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Bounds must include lat and lng for both points'
+      });
+    }
+
+    console.log(`[Geocode Bounds] Getting addresses in rectangle: SW[${southWest.lat}, ${southWest.lng}] NE[${northEast.lat}, ${northEast.lng}]`);
+
+    // Use Nominatim to search within bounds
+    const boundsString = `${southWest.lat},${southWest.lng},${northEast.lat},${northEast.lng}`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&viewbox=${boundsString}&limit=100`;
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'SCE-Route-Planner/1.0'
+      },
+      signal: AbortSignal.timeout(15000)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Nominatim returned ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data || !Array.isArray(data)) {
+      return res.json({
+        success: true,
+        addresses: []
+      });
+    }
+
+    // Extract addresses from results
+    const addresses = data.map(result => ({
+      display_name: result.display_name,
+      lat: parseFloat(result.lat),
+      lon: parseFloat(result.lon),
+      address: result.address
+    }));
+
+    console.log(`[Geocode Bounds] Found ${addresses.length} addresses in rectangle`);
+
+    res.json({
+      success: true,
+      addresses
+    });
+
+  } catch (error) {
+    console.error('[Geocode Bounds] Error:', error.message);
+
+    if (error.name === 'AbortError') {
+      return res.status(504).json({
+        error: 'Gateway Timeout',
+        message: 'Geocoding request timed out'
+      });
+    }
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
 // ============================================
 // START SERVER
 // ============================================
