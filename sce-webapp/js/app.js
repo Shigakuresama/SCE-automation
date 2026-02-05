@@ -257,11 +257,14 @@ class RoutePlannerApp {
    */
   setupSCEMessageListener() {
     window.addEventListener('message', (event) => {
-      // Only accept messages from SCE domain
-      if (event.origin !== 'https://sce.dsmcentral.com') return;
-
       const { type, data } = event.data;
-      console.log('[App] Received message from SCE:', type, data);
+
+      // Only process known message types
+      if (!['ADDRESS_COMPLETE', 'SCRIPT_ERROR', 'SCRIPT_READY'].includes(type)) {
+        return;
+      }
+
+      console.log('[App] Received message:', type, 'from:', event.origin, data);
 
       if (type === 'ADDRESS_COMPLETE') {
         this.handleAddressComplete(data);
