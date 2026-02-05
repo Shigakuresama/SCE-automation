@@ -84,6 +84,7 @@ class RoutePlannerApp {
     this.elements.selectedCount = document.getElementById('selectedCount');
     this.elements.addressList = document.getElementById('addressList');
     this.elements.mapProcessBtn = document.getElementById('mapProcessBtn');
+    this.elements.rangeProcessBtn = document.getElementById('rangeProcessBtn');
 
     // Range form
     this.elements.addressRangeForm = document.getElementById('addressRangeForm');
@@ -151,6 +152,11 @@ class RoutePlannerApp {
     // Map Process button
     if (this.elements.mapProcessBtn) {
       this.elements.mapProcessBtn.addEventListener('click', () => this.handleProcessAndGeneratePDF());
+    }
+
+    // Range Process button
+    if (this.elements.rangeProcessBtn) {
+      this.elements.rangeProcessBtn.addEventListener('click', () => this.handleProcessAndGeneratePDF());
     }
 
     // Address range form
@@ -607,6 +613,11 @@ class RoutePlannerApp {
       this.state.generatedAddresses = addresses;
       this.updateGeneratedAddresses();
       this.updateRouteSummary();
+
+      // Enable Process button when addresses are generated
+      if (this.state.generatedAddresses.length > 0 && this.elements.rangeProcessBtn) {
+        this.elements.rangeProcessBtn.disabled = false;
+      }
 
       this.showStatus(`Generated ${addresses.length} addresses`, 'success');
 
