@@ -128,8 +128,8 @@ export class SCEAutomation {
    * @private
    */
   _buildSCEUrl(address) {
-    // Start at login page - userscript will handle login and navigate to customer search
-    return SCE_LOGIN_URL;
+    // Open customer search directly - user should already be logged in via Trade Ally Community
+    return 'https://sce.dsmcentral.com/onsite/customer-search';
   }
 
   /**
