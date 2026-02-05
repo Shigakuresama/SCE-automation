@@ -1028,14 +1028,29 @@ class RoutePlannerApp {
     if (!this.state.sceAutomation) {
       this.state.sceAutomation = new SCEAutomation({
         onProgress: (progress) => {
+          const percent = Math.round((progress.completed / progress.total) * 100);
+          const currentAddress = progress.current.address || progress.current.full || '';
+
           this.showStatus(
-            `Processing: ${progress.completed}/${progress.total} - ${progress.current.address}`,
+            `Processing: ${progress.completed}/${progress.total} (${percent}%) - ${currentAddress}`,
             'info'
           );
+
+          // Update process-status span if exists
+          const statusSpan = document.querySelector('.process-status');
+          if (statusSpan) {
+            statusSpan.textContent = `${progress.completed}/${progress.total} (${percent}%)`;
+          }
         },
         onComplete: (results) => {
           this.showStatus(`Completed ${results.length} addresses`, 'success');
           this.elements.processAllBtn.disabled = false;
+
+          // Clear process-status span when complete
+          const statusSpan = document.querySelector('.process-status');
+          if (statusSpan) {
+            statusSpan.textContent = '';
+          }
         },
         onError: (error) => {
           this.showStatus(`Error: ${error.address} - ${error.error}`, 'error');
@@ -1050,6 +1065,12 @@ class RoutePlannerApp {
       console.error('[App] SCE automation error:', error);
       this.showStatus(`Processing failed: ${error.message}`, 'error');
       this.elements.processAllBtn.disabled = false;
+
+      // Clear process-status span on error
+      const statusSpan = document.querySelector('.process-status');
+      if (statusSpan) {
+        statusSpan.textContent = '';
+      }
     }
   }
 
