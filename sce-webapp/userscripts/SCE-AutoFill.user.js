@@ -19,10 +19,32 @@
     // ============================================
     // CONFIGURATION - CREDENTIALS
     // ============================================
-    const CONFIG = {
-        username: 'Sergio.correa@sce.tac',
-        password: 'Reliable1'
-    };
+    // Get credentials from localStorage or prompt user
+    function getCredentials() {
+        let username = localStorage.getItem('sce_username');
+        let password = localStorage.getItem('sce_password');
+
+        if (!username || !password) {
+            // Prompt user for credentials
+            username = prompt('Enter SCE Trade Ally username:');
+            if (!username) return null;
+
+            password = prompt('Enter SCE Trade Ally password:');
+            if (!password) return null;
+
+            // Save to localStorage for future use
+            localStorage.setItem('sce_username', username);
+            localStorage.setItem('sce_password', password);
+        }
+
+        return { username, password };
+    }
+
+    const CONFIG = getCredentials();
+    if (!CONFIG) {
+        console.error('[SCE AutoFill] No credentials provided. Automation cannot continue.');
+        // Optionally show user-facing error
+    }
 
     // ============================================
     // MESSAGE HANDLING
