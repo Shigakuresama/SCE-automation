@@ -282,3 +282,272 @@ body {
   padding-top: 20px;
   border-top: 1px solid var(--border-color);
 }
+
+/* Route marker animation */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.7);
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 0 10px rgba(25, 118, 210, 0);
+  }
+}
+
+.route-marker {
+  z-index: 1000;
+}
+
+/* Preview Modal */
+.preview-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.preview-modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.preview-modal-header h2 {
+  margin: 0;
+  color: var(--primary-color);
+}
+
+.preview-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--secondary-color);
+  padding: 0;
+  width: 32px;
+  height: 32px;
+}
+
+.preview-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.preview-info {
+  background: var(--bg-color);
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.preview-info p {
+  margin: 5px 0;
+}
+
+.preview-section {
+  margin-bottom: 15px;
+}
+
+.preview-section h3 {
+  font-size: 14px;
+  color: var(--secondary-color);
+  margin-bottom: 8px;
+}
+
+.preview-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.preview-list li {
+  padding: 6px 10px;
+  background: var(--bg-color);
+  margin-bottom: 4px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.preview-modal-footer {
+  display: flex;
+  gap: 10px;
+  padding: 15px 20px;
+  border-top: 1px solid var(--border-color);
+  justify-content: flex-end;
+}
+
+/* Three Panel Layout */
+.three-panel-layout {
+  display: flex;
+  gap: 15px;
+  height: 600px;
+}
+
+.panel-map {
+  flex: 7;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.panel-list {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 15px;
+  background: white;
+  overflow: hidden;
+}
+
+.panel-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 15px;
+  background: white;
+}
+
+.panel-list h3,
+.panel-info h3 {
+  margin: 0 0 15px 0;
+  font-size: 14px;
+  color: var(--secondary-color);
+}
+
+.route-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.route-item {
+  padding: 8px;
+  background: var(--bg-color);
+  margin-bottom: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.route-item:hover {
+  background: #e3f2fd;
+}
+
+.route-item.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+.route-item-number {
+  font-weight: bold;
+  display: inline-block;
+  width: 24px;
+}
+
+.block-info {
+  flex: 1;
+}
+
+.block-info-empty {
+  color: var(--secondary-color);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.block-info-detail {
+  margin-bottom: 10px;
+}
+
+.block-info-label {
+  font-size: 11px;
+  color: var(--secondary-color);
+  text-transform: uppercase;
+}
+
+.block-info-value {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--primary-color);
+}
+
+.block-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.block-actions button {
+  width: 100%;
+}
+
+/* Route List Component */
+.route-list-empty {
+  text-align: center;
+  color: var(--secondary-color);
+  font-style: italic;
+  padding: 20px;
+}
+
+.route-item-status {
+  margin-left: auto;
+  color: var(--success-color);
+  font-weight: bold;
+}
+
+/* Progress bar */
+.progress-container {
+  margin-top: 15px;
+  display: none;
+}
+
+.progress-container.active {
+  display: block;
+}
+
+.progress-bar-bg {
+  height: 24px;
+  background: #e0e0e0;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1976D2, #4CAF50);
+  width: 0%;
+  transition: width 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
