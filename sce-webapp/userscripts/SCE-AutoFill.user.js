@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SCE Route Planner AutoFill
 // @namespace    http://localhost:8080
-// @version      1.3
+// @version      1.4
 // @description  Auto-fill SCE forms and send customer data back to webapp
 // @match        https://sce.dsmcentral.com/*
 // @match        https://sce-trade-ally-community.my.site.com/*
@@ -47,6 +47,39 @@
     }
 
     // ============================================
+    // UI NOTIFICATIONS
+    // ============================================
+
+    function showNotification(message, type = 'info') {
+        // Create a temporary notification element
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 16px 20px;
+            background: ${type === 'error' ? '#d32f2f' : type === 'warning' ? '#f57c00' : '#1976d2'};
+            color: white;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 999999;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            max-width: 400px;
+            word-wrap: break-word;
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 5000);
+    }
+
+    // ============================================
     // MESSAGE HANDLING
     // ============================================
 
@@ -58,9 +91,25 @@
                     type: 'SCRIPT_READY'
                 }, targetOrigin);
                 console.log('[SCE AutoFill] Notified opener that script is ready:', targetOrigin);
+            } else {
+                console.error('[SCE AutoFill] No window.opener found - this window was not opened by another window');
+                // Show user-facing notification
+                showNotification('Error: This window must be opened from the Route Planner webapp', 'error');
             }
         } catch (e) {
-            console.log('[SCE AutoFill] Could not notify opener:', e.message);
+            console.error('[SCE AutoFill] Could not notify opener:', e.message);
+            // Fallback: Try sessionStorage as alternative communication method
+            try {
+                sessionStorage.setItem('sce_autofill_ready', JSON.stringify({
+                    timestamp: Date.now(),
+                    url: window.location.href
+                }));
+                console.log('[SCE AutoFill] Ready status stored in sessionStorage as fallback');
+            } catch (storageError) {
+                console.error('[SCE AutoFill] Failed to store in sessionStorage:', storageError.message);
+            }
+            // Show user-facing error
+            showNotification('Communication error: Cannot connect to parent window. Please close this window and try again.', 'error');
         }
     }
 
@@ -90,9 +139,43 @@
                     data: data
                 }, targetOrigin);
                 console.log('[SCE AutoFill] Sent complete to:', targetOrigin, data);
+                return true;
+            } else {
+                console.error('[SCE AutoFill] No window.opener found - cannot send completion status');
+                // Fallback to sessionStorage
+                try {
+                    sessionStorage.setItem('sce_autofill_complete', JSON.stringify({
+                        timestamp: Date.now(),
+                        data: data,
+                        url: window.location.href
+                    }));
+                    console.log('[SCE AutoFill] Completion data stored in sessionStorage as fallback');
+                    showNotification('Data saved locally. Please return to the Route Planner to continue.', 'warning');
+                    return true;
+                } catch (storageError) {
+                    console.error('[SCE AutoFill] Failed to store in sessionStorage:', storageError.message);
+                    showNotification('Error: Cannot save data. Please take a screenshot of this page manually.', 'error');
+                    return false;
+                }
             }
         } catch (e) {
             console.error('[SCE AutoFill] Failed to send complete:', e.message);
+            // Try fallback to sessionStorage
+            try {
+                sessionStorage.setItem('sce_autofill_complete', JSON.stringify({
+                    timestamp: Date.now(),
+                    data: data,
+                    url: window.location.href,
+                    error: e.message
+                }));
+                console.log('[SCE AutoFill] Completion data stored in sessionStorage as fallback');
+                showNotification('Communication error - data saved locally. Check the Route Planner.', 'warning');
+                return true;
+            } catch (storageError) {
+                console.error('[SCE AutoFill] Failed to store in sessionStorage:', storageError.message);
+                showNotification('Error: Cannot communicate with parent window. Please take a screenshot manually.', 'error');
+                return false;
+            }
         }
     }
 
@@ -104,9 +187,42 @@
                     type: 'SCRIPT_ERROR',
                     data: { message }
                 }, targetOrigin);
+                console.log('[SCE AutoFill] Error sent to opener:', message);
+                return true;
+            } else {
+                console.error('[SCE AutoFill] No window.opener found - cannot send error');
+                // Fallback: Store error in sessionStorage
+                try {
+                    sessionStorage.setItem('sce_autofill_error', JSON.stringify({
+                        timestamp: Date.now(),
+                        message: message,
+                        url: window.location.href
+                    }));
+                    console.log('[SCE AutoFill] Error stored in sessionStorage as fallback');
+                } catch (storageError) {
+                    console.error('[SCE AutoFill] Failed to store error in sessionStorage:', storageError.message);
+                }
+                // Show alert to user
+                alert(`SCE AutoFill Error: ${message}\n\nPlease close this window and try again.`);
+                return false;
             }
         } catch (e) {
             console.error('[SCE AutoFill] Failed to send error:', e.message);
+            // Double fallback: Try sessionStorage, then alert
+            try {
+                sessionStorage.setItem('sce_autofill_error', JSON.stringify({
+                    timestamp: Date.now(),
+                    message: message,
+                    originalError: e.message,
+                    url: window.location.href
+                }));
+                console.log('[SCE AutoFill] Error stored in sessionStorage as fallback');
+            } catch (storageError) {
+                console.error('[SCE AutoFill] Failed to store error in sessionStorage:', storageError.message);
+            }
+            // Always show alert as last resort
+            alert(`SCE AutoFill Error: ${message}\n\nCommunication with parent window failed. Please take a screenshot and contact support.`);
+            return false;
         }
     }
 
@@ -194,12 +310,16 @@
             } else if (window.location.href.includes('application-status') ||
                        window.location.href.includes('customer-information')) {
                 const customerData = extractCustomerData();
-                sendComplete({
+                const sent = sendComplete({
                     address: address.full,
                     ...customerData,
                     status: 'complete'
                 });
-                closeWindow();
+                if (sent) {
+                    closeWindow();
+                } else {
+                    showNotification('Failed to send data to parent window. Window will remain open.', 'error');
+                }
             } else if (window.location.href.includes('login') && !window.location.href.includes('tradeally')) {
                 // Redirect to correct login URL
                 console.log('[SCE AutoFill] Redirecting to correct login URL...');
@@ -332,13 +452,17 @@
                 console.log('[SCE AutoFill] On status/customer info page');
                 const customerData = extractCustomerData();
 
-                sendComplete({
+                const sent = sendComplete({
                     address: currentAddress?.full || '',
                     ...customerData,
                     status: 'complete'
                 });
 
-                closeWindow();
+                if (sent) {
+                    closeWindow();
+                } else {
+                    showNotification('Failed to send data to parent window. Window will remain open.', 'error');
+                }
                 return;
             }
 
