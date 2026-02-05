@@ -92,8 +92,6 @@ export class SCEAutomation {
 
       // Setup message handler
       const messageHandler = (event) => {
-        if (event.origin !== SCE_BASE_URL) return;
-
         const { type, data } = event.data;
 
         if (type === 'ADDRESS_COMPLETE') {
@@ -112,7 +110,7 @@ export class SCEAutomation {
         sceWindow.postMessage({
           type: 'FILL_FORM',
           data: address
-        }, SCE_BASE_URL);
+        }, '*');
       }, 1000);
 
       // Timeout after 30 seconds
