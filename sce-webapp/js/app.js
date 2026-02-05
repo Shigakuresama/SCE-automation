@@ -83,6 +83,7 @@ class RoutePlannerApp {
     // Address display
     this.elements.selectedCount = document.getElementById('selectedCount');
     this.elements.addressList = document.getElementById('addressList');
+    this.elements.mapProcessBtn = document.getElementById('mapProcessBtn');
 
     // Range form
     this.elements.addressRangeForm = document.getElementById('addressRangeForm');
@@ -146,6 +147,11 @@ class RoutePlannerApp {
     // Undo and clear
     this.elements.undoBtn.addEventListener('click', () => this.handleUndo());
     this.elements.clearBtn.addEventListener('click', () => this.handleClear());
+
+    // Map Process button
+    if (this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.addEventListener('click', () => this.handleProcessAndGeneratePDF());
+    }
 
     // Address range form
     this.elements.addressRangeForm.addEventListener('submit', (e) => this.handleGenerateRange(e));
@@ -433,6 +439,11 @@ class RoutePlannerApp {
     this.state.selectedAddresses = this.state.mapView.getSelectedAddresses();
     this.updateSelectedAddresses();
     this._updateUndoClearButtons();
+
+    // Update Process button state
+    if (this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.disabled = this.state.selectedAddresses.length === 0;
+    }
   }
 
   /**
@@ -444,6 +455,12 @@ class RoutePlannerApp {
     this.state.selectedAddresses = [];
     this.updateSelectedAddresses();
     this._updateUndoClearButtons();
+
+    // Disable Process button when no addresses
+    if (this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.disabled = true;
+    }
+
     this.showStatus('Cleared all selections', 'info');
   }
 
@@ -468,6 +485,12 @@ class RoutePlannerApp {
     this.updateSelectedAddresses();
     this._updateUndoClearButtons();
     this.updateRouteSummary();
+
+    // Enable Process button when addresses are selected
+    if (this.state.selectedAddresses.length > 0 && this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.disabled = false;
+    }
+
     console.log('[App] Address selected:', address.full || address.display_name);
   }
 
@@ -490,6 +513,12 @@ class RoutePlannerApp {
     this.updateSelectedAddresses();
     this._updateUndoClearButtons();
     this.updateRouteSummary();
+
+    // Enable Process button when addresses are selected
+    if (this.state.selectedAddresses.length > 0 && this.elements.mapProcessBtn) {
+      this.elements.mapProcessBtn.disabled = false;
+    }
+
     this.showStatus(`Selected ${addresses.length} addresses from zone`, 'success');
   }
 

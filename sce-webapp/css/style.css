@@ -136,6 +136,18 @@ body {
   padding: 10px;
 }
 
+.address-actions {
+  margin-top: 15px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.process-status {
+  font-size: 14px;
+  color: var(--secondary-color);
+}
+
 .address-item {
   padding: 8px;
   background: var(--bg-color);
