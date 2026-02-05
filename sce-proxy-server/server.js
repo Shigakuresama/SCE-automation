@@ -27,6 +27,7 @@ const { version } = JSON.parse(await fs.readFile(path.join(__dirname, 'package.j
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.text({ type: 'text/plain', limit: '50mb' }));
 
 // Property cache
 let propertyCache = {};
@@ -310,6 +311,62 @@ app.delete('/api/cache', async (req, res) => {
   propertyCache = {};
   await saveCache();
   res.json({ success: true, message: 'Cache cleared' });
+});
+
+// ============================================
+// OVERPASS API PROXY
+// ============================================
+
+/**
+ * Proxy requests to Overpass API
+ * Used for block detection and street data
+ */
+app.post('/api/overpass', async (req, res) => {
+  try {
+    const query = req.body;
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Query must be a string'
+      });
+    }
+
+    console.log('[Overpass] Processing query');
+
+    // Call Overpass API
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: query,
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Overpass API returned ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    console.log(`[Overpass] Returning ${data.elements?.length || 0} elements`);
+
+    res.json(data);
+  } catch (error) {
+    console.error('[Overpass] Error:', error.message);
+
+    // Handle timeout
+    if (error.name === 'AbortError') {
+      return res.status(504).json({
+        error: 'Gateway Timeout',
+        message: 'Overpass API request timed out'
+      });
+    }
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
 });
 
 // ============================================

@@ -647,6 +647,13 @@ class RoutePlannerApp {
    */
   handleRoundBlock() {
     if (!this.state.mapView) return;
+
+    // Switch to map mode if not already there
+    if (this.state.mode !== 'map') {
+      this.switchMode('map');
+    }
+
+    // Enable block mode on the main map
     this.state.mapView.enableBlockMode();
     this.showStatus('Click on the map to detect a block', 'info');
   }
