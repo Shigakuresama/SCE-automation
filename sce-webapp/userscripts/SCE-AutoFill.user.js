@@ -30,10 +30,13 @@
 
     function notifyReady() {
         try {
-            window.opener?.postMessage({
-                type: 'SCRIPT_READY'
-            }, 'http://localhost:8080');
-            console.log('[SCE AutoFill] Notified opener that script is ready');
+            if (window.opener) {
+                const targetOrigin = window.opener.location.origin;
+                window.opener.postMessage({
+                    type: 'SCRIPT_READY'
+                }, targetOrigin);
+                console.log('[SCE AutoFill] Notified opener that script is ready:', targetOrigin);
+            }
         } catch (e) {
             console.log('[SCE AutoFill] Could not notify opener:', e.message);
         }
@@ -58,11 +61,14 @@
 
     function sendComplete(data) {
         try {
-            window.opener?.postMessage({
-                type: 'ADDRESS_COMPLETE',
-                data: data
-            }, 'http://localhost:8080');
-            console.log('[SCE AutoFill] Sent complete message:', data);
+            if (window.opener) {
+                const targetOrigin = window.opener.location.origin;
+                window.opener.postMessage({
+                    type: 'ADDRESS_COMPLETE',
+                    data: data
+                }, targetOrigin);
+                console.log('[SCE AutoFill] Sent complete to:', targetOrigin, data);
+            }
         } catch (e) {
             console.error('[SCE AutoFill] Failed to send complete:', e.message);
         }
@@ -70,10 +76,13 @@
 
     function sendError(message) {
         try {
-            window.opener?.postMessage({
-                type: 'SCRIPT_ERROR',
-                data: { message }
-            }, 'http://localhost:8080');
+            if (window.opener) {
+                const targetOrigin = window.opener.location.origin;
+                window.opener.postMessage({
+                    type: 'SCRIPT_ERROR',
+                    data: { message }
+                }, targetOrigin);
+            }
         } catch (e) {
             console.error('[SCE AutoFill] Failed to send error:', e.message);
         }
