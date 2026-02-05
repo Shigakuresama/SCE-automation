@@ -64,6 +64,7 @@ class RoutePlannerApp {
     // Mode containers
     this.elements.mapMode = document.getElementById('mapMode');
     this.elements.rangeMode = document.getElementById('rangeMode');
+    this.elements.blockRoutingMode = document.getElementById('blockRoutingMode');
     this.elements.routeSummary = document.getElementById('routeSummary');
 
     // Map controls
@@ -275,6 +276,7 @@ class RoutePlannerApp {
       // Block mode - hide other modes, show block routing view
       this.elements.mapMode.classList.remove('active');
       this.elements.rangeMode.classList.remove('active');
+      this.elements.blockRoutingMode.classList.add('active');
     }
 
     // Update route summary based on active mode
