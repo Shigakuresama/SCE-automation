@@ -196,13 +196,14 @@ body {
   color: white;
 }
 
-.btn-primary:hover {
-  background: #45a049;
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.btn-primary:disabled {
-  background: #ccc;
-  cursor: not-allowed;
+.btn-primary:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
 .btn-secondary {
