@@ -1,9 +1,12 @@
 // ==UserScript==
 // @name         SCE Route Planner AutoFill
 // @namespace    http://localhost:8080
-// @version      1.0
-// @description  Auto-fill SCE forms and send customer data back to webapp
+// @version      1.1
+// @description  Auto-fill SCE forms, handle login, and send customer data back to webapp
+// @match        https://sce-trade-ally-community.my.site.com/tradeally/s/login/*
 // @match        https://sce.dsmcentral.com/*
+// @grant        GM_setValue
+// @grant        GM_getValue
 // @grant        window.close
 // @run-at       document-idle
 // ==/UserScript==
@@ -13,8 +16,124 @@
 
     console.log('[SCE AutoFill] Script loaded on', window.location.href);
 
+    // ============================================
+    // CONFIGURATION - EDIT YOUR CREDENTIALS HERE
+    // ============================================
+    const CONFIG = {
+        username: 'YOUR_USERNAME_HERE',  // Your SCE username
+        password: 'YOUR_PASSWORD_HERE',  // Your SCE password
+        autoLogin: true                   // Set to false to disable auto-login
+    };
+
+    // ============================================
+    // STATE
+    // ============================================
     let currentAddress = null;
     let isProcessing = false;
+    let pendingAddress = null; // Store address if we need to login first
+
+    // ============================================
+    // SESSION MANAGEMENT
+    // ============================================
+
+    function isLoggedIn() {
+        // Check if we have a valid session
+        const sessionCookie = document.cookie.includes('sid');
+        const notOnLoginPage = !window.location.href.includes('/login/');
+        return sessionCookie && notOnLoginPage;
+    }
+
+    function saveSession() {
+        // Save session data for reuse
+        const cookies = document.cookie;
+        GM_setValue('sce_cookies', cookies);
+        GM_setValue('sce_session_time', Date.now());
+    }
+
+    function loadSession() {
+        // Restore session if available and recent (< 1 hour)
+        const savedTime = GM_getValue('sce_session_time', 0);
+        const hourAgo = Date.now() - (60 * 60 * 1000);
+
+        if (savedTime > hourAgo) {
+            console.log('[SCE AutoFill] Session is recent, skipping login');
+            return true;
+        }
+        return false;
+    }
+
+    // ============================================
+    // LOGIN HANDLING
+    // ============================================
+
+    async function handleLogin() {
+        if (!CONFIG.autoLogin) {
+            console.log('[SCE AutoFill] Auto-login disabled, waiting for manual login');
+            return false;
+        }
+
+        if (CONFIG.username === 'YOUR_USERNAME_HERE') {
+            console.log('[SCE AutoFill] Please configure your credentials in the userscript CONFIG section');
+            alert('Please configure your SCE credentials in the Tampermonkey script!');
+            return false;
+        }
+
+        console.log('[SCE AutoFill] Attempting auto-login...');
+
+        // Wait for login form
+        await waitForElement('input[type="email"], input[name="username"]', 5000);
+
+        // Find username field
+        const usernameInput = document.querySelector('input[type="email"], input[name="username"], input[id*="username" i], input[id*="email" i]');
+        if (usernameInput) {
+            await setInputValue(usernameInput, CONFIG.username);
+            console.log('[SCE AutoFill] ✓ Username filled');
+        } else {
+            console.log('[SCE AutoFill] Username field not found');
+            return false;
+        }
+
+        await sleep(300);
+
+        // Find password field
+        const passwordInput = document.querySelector('input[type="password"]');
+        if (passwordInput) {
+            await setInputValue(passwordInput, CONFIG.password);
+            console.log('[SCE AutoFill] ✓ Password filled');
+        } else {
+            console.log('[SCE AutoFill] Password field not found');
+            return false;
+        }
+
+        await sleep(500);
+
+        // Find and click login button
+        const loginBtn = document.querySelector('button[type="submit"], input[type="submit"], button:has-text("Log In"), button:has-text("Sign In")');
+        if (!loginBtn) {
+            // Try by text content
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const btn = buttons.find(b => b.textContent.includes('Log In') || b.textContent.includes('Sign In') || b.textContent.includes('Login'));
+            if (btn) {
+                btn.click();
+                console.log('[SCE AutoFill] ✓ Login button clicked');
+            }
+        } else {
+            loginBtn.click();
+            console.log('[SCE AutoFill] ✓ Login button clicked');
+        }
+
+        // Wait for navigation
+        await sleep(3000);
+
+        // Check if login succeeded
+        if (!window.location.href.includes('/login/')) {
+            console.log('[SCE AutoFill] ✓ Login successful!');
+            saveSession();
+            return true;
+        }
+
+        return false;
+    }
 
     // ============================================
     // MESSAGE HANDLING
@@ -70,11 +189,56 @@
         }
     }
 
+    // ============================================
+    // MAIN INITIALIZATION
+    // ============================================
+
+    async function init() {
+        const url = window.location.href;
+
+        // If on login page, try to login
+        if (url.includes('sce-trade-ally-community.my.site.com/tradeally/s/login/')) {
+            console.log('[SCE AutoFill] On login page');
+
+            // Check if we have a pending address to process
+            if (pendingAddress) {
+                console.log('[SCE AutoFill] Have pending address, will login and continue');
+                const loginSuccess = await handleLogin();
+
+                if (loginSuccess) {
+                    // After successful login, navigate to customer search
+                    await sleep(2000);
+                    window.location.href = 'https://sce.dsmcentral.com/onsite/customer-search';
+                } else {
+                    sendError('Login failed. Please check your credentials.');
+                }
+            }
+        }
+        // If on SCE main site, handle form filling
+        else if (url.includes('sce.dsmcentral.com')) {
+            console.log('[SCE AutoFill] On SCE main site');
+            notifyReady();
+
+            // If we have a pending address from after-login redirect
+            if (pendingAddress && url.includes('customer-search')) {
+                console.log('[SCE AutoFill] Processing pending address after login');
+                const addr = pendingAddress;
+                pendingAddress = null;
+                await fillSCEForm(addr);
+            }
+        }
+
+        // Always notify ready when on SCE pages
+        if (url.includes('sce.dsmcentral.com')) {
+            notifyReady();
+        }
+    }
+
     // Notify ready when page loads
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', notifyReady);
+        document.addEventListener('DOMContentLoaded', init);
     } else {
-        notifyReady();
+        init();
     }
 
     // ============================================
@@ -82,6 +246,14 @@
     // ============================================
 
     async function fillSCEForm(address) {
+        // Check if we need to login first
+        if (!isLoggedIn() && CONFIG.autoLogin) {
+            console.log('[SCE AutoFill] Not logged in, redirecting to login...');
+            pendingAddress = address;
+            window.location.href = 'https://sce-trade-ally-community.my.site.com/tradeally/s/login/';
+            return;
+        }
+
         isProcessing = true;
         console.log('[SCE AutoFill] Starting form fill for:', address.full);
 
@@ -104,7 +276,7 @@
                 });
                 closeWindow();
             } else {
-                // Redirect to customer search
+                // Navigate to customer search
                 window.location.href = 'https://sce.dsmcentral.com/onsite/customer-search';
             }
         } catch (error) {
@@ -119,7 +291,7 @@
         console.log('[SCE AutoFill] Filling Customer Search...');
 
         // Wait for form to be ready
-        await waitForElement('input[placeholder*="Street Address" i]', 5000);
+        await waitForElement('input[placeholder*="Street Address" i]', 10000);
 
         // Find Street Address input
         let addressInput = document.querySelector('input[placeholder*="Street Address" i], input[aria-label*="Street Address" i]');
@@ -186,7 +358,8 @@
         for (let i = 0; i < 60; i++) {
             // Check if we're on application status or customer info page
             if (window.location.href.includes('application-status') ||
-                window.location.href.includes('customer-information')) {
+                window.location.href.includes('customer-information') ||
+                window.location.href.includes('customer-info')) {
 
                 console.log('[SCE AutoFill] ✓ On status/customer info page');
 
@@ -224,7 +397,9 @@
             '.customer-name',
             '[data-testid="customer-name"]',
             'app-customer-info .customer-name',
-            '.applicant-name'
+            '.applicant-name',
+            '[class*="customer-name"]',
+            '[id*="customer-name"]'
         ];
 
         for (const selector of nameSelectors) {
@@ -237,8 +412,8 @@
 
         // Try to find name from form fields
         if (!data.customerName) {
-            const firstName = document.querySelector('input[placeholder*="First Name" i], [formcontrolname="firstName"]');
-            const lastName = document.querySelector('input[placeholder*="Last Name" i], [formcontrolname="lastName"]');
+            const firstName = document.querySelector('input[placeholder*="First Name" i], [formcontrolname="firstName"], input[id*="firstname" i], input[id*="firstName" i]');
+            const lastName = document.querySelector('input[placeholder*="Last Name" i], [formcontrolname="lastName"], input[id*="lastname" i], input[id*="lastName" i]');
             if (firstName?.value && lastName?.value) {
                 data.customerName = `${firstName.value} ${lastName.value}`.trim();
             }
@@ -249,7 +424,8 @@
             'input[placeholder*="Phone" i]',
             '[formcontrolname="phone"]',
             '[formcontrolname="phoneNumber"]',
-            '.customer-phone'
+            '.customer-phone',
+            'input[id*="phone" i]'
         ];
 
         for (const selector of phoneSelectors) {
@@ -264,7 +440,9 @@
         const caseIdSelectors = [
             '.case-id',
             '[data-testid="case-id"]',
-            '.application-number'
+            '.application-number',
+            '[class*="case-id"]',
+            '[id*="case" i]'
         ];
 
         for (const selector of caseIdSelectors) {
