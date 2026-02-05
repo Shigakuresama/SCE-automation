@@ -7,16 +7,26 @@ import { MapView } from './map-view.js';
 import { PDFGenerator } from './pdf-generator.js';
 import { generateAddressRange, parseAddress } from './address-generator.js';
 import { Storage } from './storage.js';
+import { BlockDetector } from './block-detector.js';
+import { PreviewModal } from './preview-modal.js';
+import { RouteVisualizer } from './route-visualizer.js';
+import { RouteList } from './route-list.js';
 
 class RoutePlannerApp {
   constructor() {
     // Application state
     this.state = {
-      mode: 'map', // 'map' or 'range'
+      mode: 'map', // 'map', 'range', or 'block'
       mapView: null,
       selectedAddresses: [],
       generatedAddresses: [],
-      drawMode: null // 'rectangle' or 'circle'
+      drawMode: null, // 'rectangle' or 'circle'
+      blockMode: false,
+      currentBlock: null,
+      blockDetector: null,
+      previewModal: null,
+      routeVisualizer: null,
+      routeList: null
     };
 
     // PDF generator instance
@@ -91,6 +101,17 @@ class RoutePlannerApp {
 
     // Status message
     this.elements.statusMessage = document.getElementById('statusMessage');
+
+    // Block routing elements
+    this.elements.roundBlockBtn = document.getElementById('roundBlockBtn');
+    this.elements.clearRouteBtn = document.getElementById('clearRouteBtn');
+    this.elements.blockMap = document.getElementById('blockMap');
+    this.elements.routeList = document.getElementById('routeList');
+    this.elements.routeCount = document.getElementById('routeCount');
+    this.elements.blockInfo = document.getElementById('blockInfo');
+    this.elements.blockActions = document.getElementById('blockActions');
+    this.elements.testOneBtn = document.getElementById('testOneBtn');
+    this.elements.processAllBtn = document.getElementById('processAllBtn');
   }
 
   /**
@@ -131,6 +152,20 @@ class RoutePlannerApp {
     this.elements.mapContainer.addEventListener('mapError', (e) => {
       this.showStatus(e.detail.message, 'error');
     });
+
+    // Block routing events
+    if (this.elements.roundBlockBtn) {
+      this.elements.roundBlockBtn.addEventListener('click', () => this.handleRoundBlock());
+    }
+    if (this.elements.clearRouteBtn) {
+      this.elements.clearRouteBtn.addEventListener('click', () => this.handleClearRoute());
+    }
+    if (this.elements.testOneBtn) {
+      this.elements.testOneBtn.addEventListener('click', () => this.handleTestOne());
+    }
+    if (this.elements.processAllBtn) {
+      this.elements.processAllBtn.addEventListener('click', () => this.handleProcessAll());
+    }
   }
 
   /**
@@ -148,7 +183,8 @@ class RoutePlannerApp {
         zoom,
         proxyUrl: 'http://localhost:3000',
         onAddressSelect: (address) => this.handleAddressSelect(address),
-        onZoneSelect: (addresses) => this.handleZoneSelect(addresses)
+        onZoneSelect: (addresses) => this.handleZoneSelect(addresses),
+        onBlockDetect: (block) => this.handleBlockDetected(block)
       });
 
       console.log('[App] MapView initialized');
@@ -232,9 +268,13 @@ class RoutePlannerApp {
           this.state.mapView.invalidateSize();
         }
       }, 100);
-    } else {
+    } else if (mode === 'range') {
       this.elements.mapMode.classList.remove('active');
       this.elements.rangeMode.classList.add('active');
+    } else if (mode === 'block') {
+      // Block mode - hide other modes, show block routing view
+      this.elements.mapMode.classList.remove('active');
+      this.elements.rangeMode.classList.remove('active');
     }
 
     // Update route summary based on active mode
@@ -594,6 +634,147 @@ class RoutePlannerApp {
       console.error('[App] PDF generation error:', error);
       this.showStatus('Failed to generate PDF: ' + error.message, 'error');
     }
+  }
+
+  // ============================================
+  // BLOCK ROUTING
+  // ============================================
+
+  /**
+   * Handle Round Block button click
+   */
+  handleRoundBlock() {
+    if (!this.state.mapView) return;
+    this.state.mapView.enableBlockMode();
+    this.showStatus('Click on the map to detect a block', 'info');
+  }
+
+  /**
+   * Handle block detected event
+   */
+  async handleBlockDetected(block) {
+    this.state.currentBlock = block;
+
+    const previewModal = new PreviewModal();
+    const showRoute = await previewModal.show(block);
+
+    if (showRoute) {
+      this.showBlockRoutingView(block);
+    }
+  }
+
+  /**
+   * Show the block routing view with three-panel layout
+   */
+  showBlockRoutingView(block) {
+    // Switch to block routing mode
+    this.switchMode('block');
+
+    // Update block info panel
+    this.updateBlockInfo(block);
+
+    // Render route list
+    this.state.routeList = new RouteList(this.elements.routeList, {
+      onItemClick: (address, index, isHover) => this.handleRouteItemClick(address, index, isHover)
+    });
+    this.state.routeList.render(block.addresses);
+
+    // Initialize map for block routing
+    if (!this.state.blockMapView) {
+      this.state.blockMapView = L.map(this.elements.blockMap).setView([block.center.lat, block.center.lon], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(this.state.blockMapView);
+
+      this.state.routeVisualizer = new RouteVisualizer(this.state.blockMapView);
+    }
+
+    // Visualize route
+    this.state.routeVisualizer.visualizeRoute(block);
+
+    // Show action buttons
+    if (this.elements.clearRouteBtn) {
+      this.elements.clearRouteBtn.style.display = 'inline-block';
+    }
+    if (this.elements.blockActions) {
+      this.elements.blockActions.style.display = 'flex';
+    }
+
+    this.showStatus(`Block detected with ${block.totalAddresses} addresses`, 'success');
+  }
+
+  /**
+   * Update block info panel with block details
+   */
+  updateBlockInfo(block) {
+    if (!this.elements.blockInfo) return;
+
+    this.elements.blockInfo.innerHTML = `
+      <div class="block-info-detail">
+        <div class="block-info-label">Total Addresses</div>
+        <div class="block-info-value">${block.totalAddresses}</div>
+      </div>
+      <div class="block-info-detail">
+        <div class="block-info-label">Est. Time</div>
+        <div class="block-info-value">${block.estimatedTime}</div>
+      </div>
+    `;
+  }
+
+  /**
+   * Handle route list item click or hover
+   */
+  handleRouteItemClick(address, index, isHover = false) {
+    if (this.state.routeVisualizer) {
+      if (isHover) {
+        this.state.routeVisualizer.highlightAddress(index);
+      } else {
+        // Handle click - could show details
+        console.log('[App] Route item clicked:', address);
+      }
+    }
+  }
+
+  /**
+   * Handle clear route button click
+   */
+  handleClearRoute() {
+    if (this.state.routeVisualizer) {
+      this.state.routeVisualizer.clearRoute();
+    }
+    if (this.state.routeList) {
+      this.state.routeList.clear();
+    }
+    if (this.elements.blockInfo) {
+      this.elements.blockInfo.innerHTML = '<p class="block-info-empty">Click "Round Block" to detect a block</p>';
+    }
+    if (this.elements.blockActions) {
+      this.elements.blockActions.style.display = 'none';
+    }
+    if (this.elements.clearRouteBtn) {
+      this.elements.clearRouteBtn.style.display = 'none';
+    }
+    if (this.elements.routeCount) {
+      this.elements.routeCount.textContent = '0';
+    }
+    this.state.currentBlock = null;
+    this.showStatus('Route cleared', 'info');
+  }
+
+  /**
+   * Handle Test One button click
+   */
+  handleTestOne() {
+    this.showStatus('Test mode - processing first address only', 'info');
+    // Will be implemented in SCE automation task
+  }
+
+  /**
+   * Handle Process All button click
+   */
+  handleProcessAll() {
+    this.showStatus('Processing all addresses...', 'info');
+    // Will be implemented in SCE automation task
   }
 
   // ============================================
