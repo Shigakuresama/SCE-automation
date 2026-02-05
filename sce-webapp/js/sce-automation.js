@@ -110,7 +110,7 @@ export class SCEAutomation {
         sceWindow.postMessage({
           type: 'FILL_FORM',
           data: address
-        }, '*');
+        }, 'https://sce.dsmcentral.com');
       }, 1000);
 
       // Timeout after 30 seconds
