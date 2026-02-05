@@ -11,6 +11,7 @@ import { BlockDetector } from './block-detector.js';
 import { PreviewModal } from './preview-modal.js';
 import { RouteVisualizer } from './route-visualizer.js';
 import { RouteList } from './route-list.js';
+import { SCEAutomation } from './sce-automation.js';
 
 class RoutePlannerApp {
   constructor() {
@@ -26,7 +27,9 @@ class RoutePlannerApp {
       blockDetector: null,
       previewModal: null,
       routeVisualizer: null,
-      routeList: null
+      routeList: null,
+      sceAutomation: null,
+      capturedCustomerData: [] // Stores {address, customerName, phone, caseId}
     };
 
     // PDF generator instance
@@ -51,6 +54,7 @@ class RoutePlannerApp {
     this.setupEventListeners();
     this.initMapView();
     this.loadSettings();
+    this.setupSCEMessageListener();
     console.log('[App] SCE Route Planner initialized');
   }
 
@@ -233,6 +237,64 @@ class RoutePlannerApp {
     };
 
     Storage.set('appSettings', settings);
+  }
+
+  /**
+   * Setup message listener for SCE userscript communication
+   */
+  setupSCEMessageListener() {
+    window.addEventListener('message', (event) => {
+      // Only accept messages from SCE domain
+      if (event.origin !== 'https://sce.dsmcentral.com') return;
+
+      const { type, data } = event.data;
+      console.log('[App] Received message from SCE:', type, data);
+
+      if (type === 'ADDRESS_COMPLETE') {
+        this.handleAddressComplete(data);
+      } else if (type === 'SCRIPT_ERROR') {
+        this.handleSCEError(data);
+      } else if (type === 'SCRIPT_READY') {
+        console.log('[App] SCE userscript is ready');
+      }
+    });
+  }
+
+  /**
+   * Handle address completion from SCE userscript
+   */
+  handleAddressComplete(data) {
+    console.log('[App] Address complete:', data);
+
+    // Store captured customer data
+    this.state.capturedCustomerData.push({
+      address: data.address,
+      customerName: data.customerName || '',
+      phone: data.phone || '',
+      caseId: data.caseId || ''
+    });
+
+    // Show status
+    this.showStatus(
+      `Captured: ${data.address}${data.customerName ? ' - ' + data.customerName : ''}`,
+      'success'
+    );
+
+    // Check if all addresses processed
+    const totalToProcess = this.state.generatedAddresses.length || this.state.selectedAddresses.length || 0;
+    if (this.state.capturedCustomerData.length >= totalToProcess) {
+      this.showStatus('All addresses processed! Generate PDF to see results.', 'success');
+      // Enable PDF generation
+      this.elements.generatePdfBtn.disabled = false;
+    }
+  }
+
+  /**
+   * Handle error from SCE userscript
+   */
+  handleSCEError(data) {
+    console.error('[App] SCE error:', data);
+    this.showStatus(`Error: ${data.message}`, 'error');
   }
 
   // ============================================
@@ -622,12 +684,27 @@ class RoutePlannerApp {
     this.showStatus('Generating PDF...', 'info');
 
     try {
+      // Merge addresses with captured customer data
+      const addressesWithData = addresses.map(addr => {
+        const fullAddress = addr.full || addr;
+        const captured = this.state.capturedCustomerData.find(
+          c => c.address === fullAddress
+        );
+
+        return {
+          address: fullAddress,
+          customerName: captured?.customerName || '',
+          phone: captured?.phone || '',
+          caseId: captured?.caseId || ''
+        };
+      });
+
       // Generate filename with timestamp
       const date = new Date();
       const timestamp = date.toISOString().slice(0, 10);
       const filename = `sce-route-${timestamp}.pdf`;
 
-      await this.pdfGenerator.generateAndDownload(addresses, filename);
+      await this.pdfGenerator.generateAndDownload(addressesWithData, filename);
 
       this.showStatus('PDF downloaded successfully', 'success');
       console.log('[App] PDF generated:', filename);
@@ -775,7 +852,19 @@ class RoutePlannerApp {
    */
   handleTestOne() {
     this.showStatus('Test mode - processing first address only', 'info');
-    // Will be implemented in SCE automation task
+
+    // Get addresses based on current mode
+    const addresses = this.state.mode === 'block'
+      ? this.state.currentBlock?.addresses
+      : this.state.generatedAddresses;
+
+    if (!addresses || addresses.length === 0) {
+      this.showStatus('No addresses to process', 'warning');
+      return;
+    }
+
+    // Process just the first address
+    this.processAddresses([addresses[0]]);
   }
 
   /**
@@ -783,7 +872,55 @@ class RoutePlannerApp {
    */
   handleProcessAll() {
     this.showStatus('Processing all addresses...', 'info');
-    // Will be implemented in SCE automation task
+
+    // Get addresses based on current mode
+    const addresses = this.state.mode === 'block'
+      ? this.state.currentBlock?.addresses
+      : this.state.generatedAddresses;
+
+    if (!addresses || addresses.length === 0) {
+      this.showStatus('No addresses to process', 'warning');
+      return;
+    }
+
+    // Disable button during processing
+    this.elements.processAllBtn.disabled = true;
+
+    // Process all addresses
+    this.processAddresses(addresses);
+  }
+
+  /**
+   * Process addresses through SCE automation
+   */
+  async processAddresses(addresses) {
+    // Initialize SCE automation
+    if (!this.state.sceAutomation) {
+      this.state.sceAutomation = new SCEAutomation({
+        onProgress: (progress) => {
+          this.showStatus(
+            `Processing: ${progress.completed}/${progress.total} - ${progress.current.address}`,
+            'info'
+          );
+        },
+        onComplete: (results) => {
+          this.showStatus(`Completed ${results.length} addresses`, 'success');
+          this.elements.processAllBtn.disabled = false;
+        },
+        onError: (error) => {
+          this.showStatus(`Error: ${error.address} - ${error.error}`, 'error');
+        }
+      });
+    }
+
+    // Start processing
+    try {
+      await this.state.sceAutomation.process(addresses);
+    } catch (error) {
+      console.error('[App] SCE automation error:', error);
+      this.showStatus(`Processing failed: ${error.message}`, 'error');
+      this.elements.processAllBtn.disabled = false;
+    }
   }
 
   // ============================================
