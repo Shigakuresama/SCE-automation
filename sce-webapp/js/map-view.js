@@ -300,44 +300,115 @@ class MapView {
       return null;
     }
 
-    try {
-      const url = `${this.proxyUrl}/api/geocode?q=${encodeURIComponent(query.trim())}`;
+    const trimmedQuery = query.trim();
 
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(5000) // 5 second timeout
-      });
+    // Smart search: try multiple strategies
+    const searchStrategies = [
+      // 1. Original query (exact match)
+      trimmedQuery,
 
-      if (!response.ok) {
-        console.error('[MapView] Address search failed:', response.status, response.statusText);
-        return null;
+      // 2. Add "Santa Ana, CA" if no city/state detected
+      this._shouldAddDefaultLocation(trimmedQuery)
+        ? `${trimmedQuery}, Santa Ana, CA`
+        : null,
+
+      // 3. Add "CA" if just street + city
+      this._shouldAddState(trimmedQuery)
+        ? `${trimmedQuery}, CA`
+        : null,
+
+      // 4. Just street name + default location
+      this._isStreetNameOnly(trimmedQuery)
+        ? `${trimmedQuery}, Santa Ana, CA`
+        : null,
+
+      // 5. Try with "Ave" if "Ln" or no street type
+      /\d+.*\s+(St|Street)$/.test(trimmedQuery)
+        ? `${trimmedQuery} Ave, Santa Ana, CA`
+        : null
+    ].filter(Boolean);
+
+    // Try each search strategy
+    for (const searchQuery of searchStrategies) {
+      if (searchQuery !== trimmedQuery) {
+        console.log(`[MapView] Trying fallback search: "${searchQuery}"`);
       }
 
-      const json = await response.json();
+      try {
+        const url = `${this.proxyUrl}/api/geocode?q=${encodeURIComponent(searchQuery)}`;
 
-      if (!json.success || !json.data) {
-        return null;
+        const response = await fetch(url, {
+          signal: AbortSignal.timeout(5000)
+        });
+
+        if (!response.ok) {
+          continue; // Try next strategy
+        }
+
+        const json = await response.json();
+
+        if (json.success && json.data) {
+          console.log(`[MapView] Found with query: "${searchQuery}"`);
+          // Normalize response format
+          return {
+            lat: json.data.lat,
+            lng: json.data.lon,
+            lon: json.data.lon,
+            display_name: json.data.display_name,
+            address: json.data.address,
+            raw: json.data.raw
+          };
+        }
+      } catch (error) {
+        console.error(`[MapView] Search failed for "${searchQuery}":`, error.message);
+        // Continue to next strategy
       }
-
-      // Normalize response format
-      return {
-        lat: json.data.lat,
-        lng: json.data.lon,
-        lon: json.data.lon, // For compatibility
-        display_name: json.data.display_name,
-        address: json.data.address,
-        raw: json.data.raw
-      };
-
-    } catch (error) {
-      console.error('[MapView] Address search error:', error.message);
-
-      this._dispatchError(error.name === 'AbortError'
-        ? 'Search timed out. Is the proxy server running?'
-        : 'Search failed. Make sure proxy server is running on port 3000.'
-      );
-
-      return null;
     }
+
+    // All strategies failed
+    console.error(`[MapView] Address not found: "${trimmedQuery}"`);
+    this._dispatchError(`Address not found. Try: "Street Number Street Name, Santa Ana, CA"`);
+    return null;
+  }
+
+  /**
+   * Check if query should have default location added
+   * @private
+   */
+  _shouldAddDefaultLocation(query) {
+    // Check if query lacks city/state
+    const noCityState = !/\b(California|CA)\b/i.test(query) &&
+                        !/\b(Santa Ana|Anaheim|Garden Grove|Irvine|Orange|Tustin|Fountain Valley)\b/i.test(query);
+
+    // Check if it looks like an address (has numbers or street words)
+    const looksLikeAddress = /\d/.test(query) ||
+                           /\b(Ave|Avenue|St|Street|Ln|Lane|Dr|Drive|Blvd|Boulevard|Way|Pl|Place|Ct|Court|Rd|Road)\b/i.test(query);
+
+    return noCityState && looksLikeAddress;
+  }
+
+  /**
+   * Check if query should have state added
+   * @private
+   */
+  _shouldAddState(query) {
+    // Has city but no state
+    const hasCity = /\b(Santa Ana|Anaheim|Garden Grove|Irvine|Orange|Tustin|Fountain Valley)\b/i.test(query);
+    const noState = !/\b(California|CA)\b/i.test(query);
+
+    return hasCity && noState;
+  }
+
+  /**
+   * Check if query is just a street name
+   * @private
+   */
+  _isStreetNameOnly(query) {
+    // Check if query has NO numbers and looks like a street name
+    const noNumbers = !/\d/.test(query);
+    const hasStreetWord = /\b(Ave|Avenue|St|Street|Ln|Lane|Dr|Drive|Blvd|Boulevard|Way|Pl|Place|Ct|Court|Rd|Road)\b/i.test(query);
+
+    return noNumbers && hasStreetWord && query.length < 50;
   }
 
   /**

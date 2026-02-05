@@ -370,6 +370,216 @@ app.post('/api/overpass', async (req, res) => {
 });
 
 // ============================================
+// GEOCODING API (Nominatim)
+// ============================================
+
+// Forward geocode: address → coordinates
+app.get('/api/geocode', async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Query parameter "q" is required'
+      });
+    }
+
+    console.log(`[Geocode] Searching for: "${q}"`);
+
+    // Use Nominatim (OpenStreetMap)
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`;
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'SCE-Route-Planner/1.0'
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Nominatim returned ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Address not found'
+      });
+    }
+
+    const result = data[0];
+
+    console.log(`[Geocode] Found: ${result.display_name}`);
+
+    res.json({
+      success: true,
+      data: {
+        display_name: result.display_name,
+        lat: parseFloat(result.lat),
+        lon: parseFloat(result.lon),
+        boundingbox: result.boundingbox ? {
+          minLat: parseFloat(result.boundingbox[0]),
+          maxLat: parseFloat(result.boundingbox[1]),
+          minLon: parseFloat(result.boundingbox[2]),
+          maxLon: parseFloat(result.boundingbox[3])
+        } : null
+      }
+    });
+  } catch (error) {
+    console.error('[Geocode] Error:', error.message);
+
+    if (error.name === 'AbortError') {
+      return res.status(504).json({
+        error: 'Gateway Timeout',
+        message: 'Geocoding request timed out'
+      });
+    }
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
+// Reverse geocode: coordinates → address
+app.get('/api/reverse-geocode', async (req, res) => {
+  try {
+    const { lat, lon } = req.query;
+
+    if (!lat || !lon) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'lat and lon parameters are required'
+      });
+    }
+
+    console.log(`[ReverseGeocode] Looking up: ${lat}, ${lon}`);
+
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'SCE-Route-Planner/1.0'
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Nominatim returned ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data || data.error) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'No address found at this location'
+      });
+    }
+
+    console.log(`[ReverseGeocode] Found: ${data.display_name}`);
+
+    res.json({
+      success: true,
+      data: {
+        display_name: data.display_name,
+        address: data.address,
+        lat: parseFloat(data.lat),
+        lon: parseFloat(data.lon)
+      }
+    });
+  } catch (error) {
+    console.error('[ReverseGeocode] Error:', error.message);
+
+    if (error.name === 'AbortError') {
+      return res.status(504).json({
+        error: 'Gateway Timeout',
+        message: 'Reverse geocoding request timed out'
+      });
+    }
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
+// Get address bounds (for selecting zones on map)
+app.get('/api/geocode/bounds', async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Query parameter "q" is required'
+      });
+    }
+
+    console.log(`[Geocode Bounds] Searching for: "${q}"`);
+
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&polygon_geojson=1`;
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'SCE-Route-Planner/1.0'
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Nominatim returned ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Address not found'
+      });
+    }
+
+    const result = data[0];
+
+    res.json({
+      success: true,
+      data: {
+        display_name: result.display_name,
+        lat: parseFloat(result.lat),
+        lon: parseFloat(result.lon),
+        boundingbox: result.boundingbox ? {
+          minLat: parseFloat(result.boundingbox[0]),
+          maxLat: parseFloat(result.boundingbox[1]),
+          minLon: parseFloat(result.boundingbox[2]),
+          maxLon: parseFloat(result.boundingbox[3])
+        } : null,
+        geojson: result.geojson
+      }
+    });
+  } catch (error) {
+    console.error('[Geocode Bounds] Error:', error.message);
+
+    if (error.name === 'AbortError') {
+      return res.status(504).json({
+        error: 'Gateway Timeout',
+        message: 'Geocoding request timed out'
+      });
+    }
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
+// ============================================
 // START SERVER
 // ============================================
 async function startServer() {
