@@ -282,3 +282,19 @@ body {
   padding-top: 20px;
   border-top: 1px solid var(--border-color);
 }
+
+/* Route marker animation */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.7);
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 0 10px rgba(25, 118, 210, 0);
+  }
+}
+
+.route-marker {
+  z-index: 1000;
+}
